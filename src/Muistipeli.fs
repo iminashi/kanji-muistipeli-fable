@@ -103,6 +103,7 @@ type Msg =
     | ToggleSettings
     | SetGameType of GameType
     | SetRevealType of RubyRevealType
+    | SetDifficulty of Difficulty
 
 let swap i1 i2 (arr : 'a array)  =
     let temp = arr.[i1]
@@ -179,20 +180,22 @@ let update (msg: Msg) (state: Model) =
     | SetRevealType reveal ->
         { state with Settings = { state.Settings with RubyReveal = reveal } }, Cmd.none
 
+    | SetDifficulty difficulty ->
+        { state with Settings = { state.Settings with Difficulty = difficulty } }, Cmd.ofMsg NewGame
+
     | CardClicked index when state.RevealedCards.Contains index ->
         state, Cmd.none
 
-    | CardClicked num ->
-        
-        let revealed = state.RevealedCards.Add num
+    | CardClicked index ->
+        let revealed = state.RevealedCards.Add index
 
         match state.FirstClicked with
         | None ->
-            { state with FirstClicked = Some num; RevealedCards = revealed }, Cmd.none
+            { state with FirstClicked = Some index; RevealedCards = revealed }, Cmd.none
 
         | Some firstIndex ->
             let firstCard = state.Cards.[firstIndex]
-            let clickedCard = state.Cards.[num]
+            let clickedCard = state.Cards.[index]
             if firstCard.Symbol = clickedCard.Symbol then
                 // Pair found
                 let rubyText = getRubyText state.Settings.RubyReveal clickedCard.Symbol
@@ -213,7 +216,7 @@ let update (msg: Msg) (state: Model) =
                 // Hide both cards
                 let task() = async {
                     do! Async.Sleep 1000
-                    return num }
+                    return index }
 
                 { state with RevealedCards = revealed }, Cmd.OfAsync.perform task () HideCards
 
@@ -257,7 +260,7 @@ let update (msg: Msg) (state: Model) =
           Cards = []
           RevealedCards = Set.empty
           GameWon = false
-          ShowSettings = false
+          ShowSettings = state.ShowSettings
           Settings = state.Settings },
         Cmd.ofMsg CreateCards
 
@@ -357,22 +360,20 @@ let view (state: Model) dispatch =
                                     prop.className "mp-opt-title"
                                     prop.text "Vaikeus"
                                 ]
-                                Html.div [
-                                    prop.classes [ "mp-button"; "mp-option"]
-                                    prop.text "Helppo"
-                                ]
-                                Html.div [
-                                    prop.classes [ "mp-button"; "mp-option"]
-                                    prop.text "Normaali"
-                                ]
-                                Html.div [
-                                    prop.classes [ "mp-button"; "mp-option"]
-                                    prop.text "Vaikea"
-                                ]
-                                Html.div [
-                                    prop.classes [ "mp-button"; "mp-option"]
-                                    prop.text "Vaikein"
-                                ]
+                                yield! [ Easy; Normal; Hard; Hardest ]
+                                |> List.map (fun diff ->
+                                    Html.div [
+                                        prop.classes [ "mp-button"; "mp-option"; if state.Settings.Difficulty = diff then "mp-selected" ]
+                                        prop.text (
+                                            match diff with
+                                            | Easy -> "Helppo"
+                                            | Normal -> "Normaali"
+                                            | Hard -> "Vaikea"
+                                            | Hardest -> "Vaikein"
+                                        )
+                                        prop.onClick (fun _ -> dispatch (SetDifficulty diff))
+                                    ]
+                                )
                             ]
                         ]
                     ]
@@ -402,6 +403,10 @@ let view (state: Model) dispatch =
                 |> List.mapi (fun i card ->
                     Html.div [
                         prop.classes [ "mp-card"; if state.RevealedCards.Contains i then "flipped" ]
+                        prop.style [
+                            if state.RevealedCards.Contains i then
+                                style.cursor.defaultCursor
+                        ]
                         prop.key i
                         prop.onClick (fun _ -> dispatch (CardClicked i))
                         prop.children [
