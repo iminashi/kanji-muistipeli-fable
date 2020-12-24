@@ -3,6 +3,12 @@
 open Feliz
 open Elmish
 open Types
+open Fable.SimpleHttp
+open Thoth.Json
+
+module Option =
+    let ofString str =
+        if System.String.IsNullOrEmpty str then None else Some str
 
 let getKanjiArray = function
     | Level1 -> Symbols.kanjiLevels.[0]
@@ -51,22 +57,25 @@ let generateSymbols settings =
             yield symbols.[i]
             yield symbols.[i] }
 
-let getKanjiDefinition kanji =
-    // TODO
-    { Character = kanji
-      Kun = Some "KUN"
-      On = Some "ON"
-      Meaning = "MEANING"}
+let kanjiDecoder : Decoder<KanjiDefinition> =
+  Decode.object (fun get -> {
+    Meaning = get.Required.At [ "meaning" ] Decode.string
+    Kun = get.Required.At [ "kun" ] Decode.string
+    On = get.Required.At [ "on" ] Decode.string
+  })
 
-let createKanji character =
-    let def = getKanjiDefinition character
-    Kanji { Character = character; Kun = def.Kun; On = def.On; Meaning = def.Meaning}
+let createKanji kanjiDefs character =
+    let def = kanjiDefs |> Map.find character
+    Kanji { Character = character
+            Kun = Option.ofString def.Kun
+            On = Option.ofString def.On
+            Meaning = def.Meaning }
 
-let createCard gameType character =
+let createCard gameType kanjiDefs character =
     let symbol =
         match gameType with
         | EmojiGame -> Emoji character
-        | KanjiGame _ -> createKanji character
+        | KanjiGame _ -> createKanji kanjiDefs character
     { Symbol = symbol; RubyText = None }
 
 let rec getRubyText reveal symbol =
@@ -102,6 +111,14 @@ let queueHideCards dispatch =
 
 let update (msg: Msg) (state: Model) =
     match msg with
+    | KanjiDefinitionsLoaded kanji ->
+        match Decode.fromString (Decode.dict kanjiDecoder) kanji with
+        | Ok defs ->
+            { state with KanjiDefinitions = defs }, Cmd.ofMsg CreateCards
+        | Error _ ->
+            // TODO
+            state, Cmd.none
+
     | SetNextCardTimeout id ->
         { state with NextCardTimeout = Some id }, Cmd.none
 
@@ -109,7 +126,7 @@ let update (msg: Msg) (state: Model) =
         { state with HideCardsTimeout = Some id }, Cmd.none
 
     | SetGameType game ->
-        { state with Settings = { state.Settings with Game = game } }, Cmd.none
+        { state with Settings = { state.Settings with Game = game } }, Cmd.ofMsg NewGame
 
     | SetRevealType reveal ->
         { state with Settings = { state.Settings with RubyReveal = reveal } }, Cmd.none
@@ -189,7 +206,7 @@ let update (msg: Msg) (state: Model) =
         let deck =
             state.Settings
             |> generateSymbols
-            |> Seq.map (createCard state.Settings.Game)
+            |> Seq.map (createCard state.Settings.Game state.KanjiDefinitions)
             |> Seq.toArray
 
         state, Cmd.ofSub (queueNextCard 1 deck)
@@ -212,6 +229,7 @@ let update (msg: Msg) (state: Model) =
           SecondClicked = None
           PairsFound = 0
           Cards = []
+          KanjiDefinitions = state.KanjiDefinitions
           RevealedCards = Set.empty
           GameWon = false
           NextCardTimeout = None
@@ -227,6 +245,11 @@ let update (msg: Msg) (state: Model) =
         { state with ShowSettings = not state.ShowSettings }, Cmd.none
         
 let init () =
+    let loadDefinitions() = async {
+        let! statusCode, responseText = Http.get "/kanji.json"
+        // TODO: Error handling
+        return if statusCode = 200 then responseText else "" }
+
     let settings =
         { Game = KanjiGame Level6
           RubyReveal = Meaning
@@ -236,13 +259,14 @@ let init () =
       SecondClicked = None
       PairsFound = 0
       Cards = []
+      KanjiDefinitions = Map.empty
       RevealedCards = Set.empty
       GameWon = false
       NextCardTimeout = None
       HideCardsTimeout = None
       ShowSettings = false
       Settings = settings },
-    Cmd.ofMsg CreateCards
+    Cmd.OfAsync.perform loadDefinitions () KanjiDefinitionsLoaded
 
 let view (state: Model) dispatch =
     React.fragment [

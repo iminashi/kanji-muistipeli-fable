@@ -36,6 +36,11 @@ type Kanji =
       On : string option
       Meaning : string }
 
+type KanjiDefinition =
+    { Kun : string
+      On : string
+      Meaning : string }
+
 type Symbol =
     | Emoji of string
     | Kanji of Kanji
@@ -49,6 +54,7 @@ type Model =
       SecondClicked : int option
       PairsFound : int
       Cards : Card list
+      KanjiDefinitions : Map<string, KanjiDefinition>
       RevealedCards : Set<int>
       GameWon : bool
       ShowSettings: bool
@@ -69,3 +75,4 @@ type Msg =
     | SetDifficulty of Difficulty
     | SetNextCardTimeout of int
     | SetHideCardsTimeout of int
+    | KanjiDefinitionsLoaded of string
