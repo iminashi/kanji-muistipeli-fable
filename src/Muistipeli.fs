@@ -10,7 +10,7 @@ module Option =
     let ofString str =
         if System.String.IsNullOrEmpty str then None else Some str
 
-let getKanjiArray = function
+let private getKanjiArray = function
     | Level1 -> Symbols.kanjiLevels.[0]
     | Level2 -> Symbols.kanjiLevels.[1]
     | Level3 -> Symbols.kanjiLevels.[2]
@@ -19,30 +19,30 @@ let getKanjiArray = function
     | Level6 -> Symbols.kanjiLevels.[5]
     | AllLevels -> Array.concat Symbols.kanjiLevels
 
-let cardsForDifficulty = function
+let private cardsForDifficulty = function
     | Easy -> 12
     | Normal -> 20
     | Hard -> 30
     | Hardest -> 42
 
-let cardsPerRowForDifficulty = function
+let private cardsPerRowForDifficulty = function
     | Easy -> 3
     | Normal -> 5
     | Hard -> 6
     | Hardest -> 7
 
-let swap i1 i2 (arr : 'a array) =
+let private swap i1 i2 (arr : 'a array) =
     let temp = arr.[i1]
     arr.[i1] <- arr.[i2]
     arr.[i2] <- temp
 
-let getRandomCard index (deck : Card array) =
+let private getRandomCard index (deck : Card array) =
     let rand = System.Random()
     let randIndex = rand.Next(index, deck.Length)
     swap index randIndex deck
     deck.[index]
 
-let generateSymbols settings =
+let private generateSymbols settings =
     let symbols =
         match settings.Game with
         | EmojiGame -> Symbols.emoji
@@ -57,28 +57,28 @@ let generateSymbols settings =
             yield symbols.[i]
             yield symbols.[i] }
 
-let kanjiDecoder : Decoder<KanjiDefinition> =
+let private kanjiDecoder : Decoder<KanjiDefinition> =
   Decode.object (fun get -> {
     Meaning = get.Required.At [ "meaning" ] Decode.string
     Kun = get.Required.At [ "kun" ] Decode.string
     On = get.Required.At [ "on" ] Decode.string
   })
 
-let createKanji kanjiDefs character =
+let private createKanji kanjiDefs character =
     let def = kanjiDefs |> Map.find character
     Kanji { Character = character
             Kun = Option.ofString def.Kun
             On = Option.ofString def.On
             Meaning = def.Meaning }
 
-let createCard gameType kanjiDefs character =
+let private createCard gameType kanjiDefs character =
     let symbol =
         match gameType with
         | EmojiGame -> Emoji character
         | KanjiGame _ -> createKanji kanjiDefs character
     { Symbol = symbol; RubyText = None }
 
-let rec getRubyText reveal symbol =
+let rec private getRubyText reveal symbol =
     match symbol with
     | Emoji _ -> None
     | Kanji kanji ->
@@ -101,11 +101,11 @@ let rec getRubyText reveal symbol =
                 | _ -> Meaning
             getRubyText rb symbol
 
-let queueNextCard index deck dispatch =
+let private queueNextCard index deck dispatch =
     let id = Fable.Core.JS.setTimeout (fun _ -> dispatch (CreateCard(index, deck))) 100
     dispatch (SetNextCardTimeout id)
 
-let queueHideCards dispatch =
+let private queueHideCards dispatch =
     let id = Fable.Core.JS.setTimeout (fun _ -> dispatch HideCards) 1000
     dispatch (SetHideCardsTimeout id)
 
