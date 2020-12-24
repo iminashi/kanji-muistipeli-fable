@@ -10,6 +10,13 @@ module Option =
     let ofString str =
         if System.String.IsNullOrEmpty str then None else Some str
 
+let private formatTime time =
+    let hundreths = (time / 100) % 10
+    let seconds = time / 1000
+    let minutes = seconds / 60
+
+    sprintf "%02i:%02i.%i" minutes (seconds % 60) hundreths
+
 let private getKanjiArray = function
     | Level1 -> Symbols.kanjiLevels.[0]
     | Level2 -> Symbols.kanjiLevels.[1]
@@ -175,11 +182,14 @@ let update (msg: Msg) (state: Model) =
                             { c with RubyText = rubyText }
                         else
                             c)
+                let gameWon = pairsFound = cardsForDifficulty state.Settings.Difficulty / 2
+
                 { state with FirstClicked = None
                              SecondClicked = None
                              PairsFound = pairsFound
                              Cards = cards
-                             GameWon = pairsFound = cardsForDifficulty state.Settings.Difficulty / 2
+                             GameWon = gameWon
+                             TimerOn = not gameWon
                              RevealedCards = revealed }, Cmd.none
             else
                 { state with RevealedCards = revealed
@@ -209,7 +219,19 @@ let update (msg: Msg) (state: Model) =
             |> Seq.map (createCard state.Settings.Game state.KanjiDefinitions)
             |> Seq.toArray
 
-        state, Cmd.ofSub (queueNextCard 1 deck)
+        { state with TimerOn = true },
+        Cmd.batch [ Cmd.ofSub (queueNextCard 1 deck)
+                    Cmd.ofMsg TimerTick ]
+
+    | TimerTick ->
+        let cmd =
+            if state.TimerOn then
+                let task() = async { do! Async.Sleep 100 }
+                Cmd.OfAsync.perform task () (fun _ -> TimerTick)
+            else
+                Cmd.none
+
+        { state with TimeElapsed = state.TimeElapsed + 100 }, cmd
 
     | CreateCard (num, deck) ->
         let randomCard = deck |> getRandomCard (num - 1)
@@ -234,6 +256,8 @@ let update (msg: Msg) (state: Model) =
           GameWon = false
           NextCardTimeout = None
           HideCardsTimeout = None
+          TimerOn = false
+          TimeElapsed = 0
           ShowSettings = state.ShowSettings
           Settings = state.Settings },
         Cmd.ofMsg CreateCards
@@ -267,6 +291,8 @@ let init () =
       GameWon = false
       NextCardTimeout = None
       HideCardsTimeout = None
+      TimerOn = false
+      TimeElapsed = 0
       ShowSettings = false
       Settings = settings },
     Cmd.OfAsync.perform loadDefinitions () KanjiDefinitionsLoaded
@@ -369,7 +395,7 @@ let view (state: Model) dispatch =
 
                 Html.div [
                     prop.className "mp-timer"
-                    prop.text "00:00.0"
+                    prop.text (formatTime state.TimeElapsed)
                 ]
             ]
         ]

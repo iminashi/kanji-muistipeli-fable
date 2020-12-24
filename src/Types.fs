@@ -57,15 +57,18 @@ type Model =
       KanjiDefinitions : Map<string, KanjiDefinition>
       RevealedCards : Set<int>
       GameWon : bool
-      ShowSettings: bool
+      ShowSettings : bool
       NextCardTimeout : int option
       HideCardsTimeout : int option
+      TimerOn : bool
+      TimeElapsed : int
       Settings : Settings }
 
 type Msg =
     | CardClicked of index : int
     | NewGame
     | CreateCards
+    | TimerTick
     | CreateCard of num : int * deck : Card array
     | HideCards
     | UpdateSettings of Settings
