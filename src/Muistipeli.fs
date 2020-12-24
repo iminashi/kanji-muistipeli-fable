@@ -85,12 +85,14 @@ type Card =
 
 type Model =
     { FirstClicked : int option
-      //SecondClicked : Card option
+      SecondClicked : int option
       PairsFound : int
       Cards : Card list
       RevealedCards : Set<int>
       GameWon : bool
       ShowSettings: bool
+      NextCardTimeout : int option
+      HideCardsTimeout : int option
       Settings : Settings }
 
 type Msg =
@@ -98,12 +100,14 @@ type Msg =
     | NewGame
     | CreateCards
     | CreateCard of num : int * deck : Card array
-    | HideCards of index : int
+    | HideCards
     | UpdateSettings of Settings
     | ToggleSettings
     | SetGameType of GameType
     | SetRevealType of RubyRevealType
     | SetDifficulty of Difficulty
+    | SetNextCardTimeout of int
+    | SetHideCardsTimeout of int
 
 let swap i1 i2 (arr : 'a array)  =
     let temp = arr.[i1]
@@ -172,8 +176,22 @@ let rec getRubyText reveal symbol =
                 | _ -> Meaning
             getRubyText rb symbol
 
+let queueNextCard index deck dispatch =
+    let id = Fable.Core.JS.setTimeout (fun _ -> dispatch (CreateCard(index, deck))) 100
+    dispatch (SetNextCardTimeout id)
+
+let queueHideCards dispatch =
+    let id = Fable.Core.JS.setTimeout (fun _ -> dispatch HideCards) 1000
+    dispatch (SetHideCardsTimeout id)
+
 let update (msg: Msg) (state: Model) =
     match msg with
+    | SetNextCardTimeout id ->
+        { state with NextCardTimeout = Some id }, Cmd.none
+
+    | SetHideCardsTimeout id ->
+        { state with HideCardsTimeout = Some id }, Cmd.none
+
     | SetGameType game ->
         { state with Settings = { state.Settings with Game = game } }, Cmd.none
 
@@ -189,16 +207,33 @@ let update (msg: Msg) (state: Model) =
     | CardClicked index ->
         let revealed = state.RevealedCards.Add index
 
-        match state.FirstClicked with
-        | None ->
-            { state with FirstClicked = Some index; RevealedCards = revealed }, Cmd.none
+        match state.FirstClicked, state.SecondClicked with
+        | Some firstIndex, Some secondIndex ->
+            state.HideCardsTimeout
+            |> Option.iter Fable.Core.JS.clearTimeout
 
-        | Some firstIndex ->
+            // Hide both revealed cards immediately
+            let revealed =
+                state.RevealedCards
+                |> Set.remove secondIndex
+                |> Set.remove firstIndex
+                |> Set.add index
+
+            { state with FirstClicked = Some index
+                         SecondClicked = None
+                         RevealedCards = revealed
+                         HideCardsTimeout = None }, Cmd.none
+        | None, None ->
+            { state with FirstClicked = Some index
+                         RevealedCards = revealed
+                         HideCardsTimeout = None }, Cmd.none
+
+        | Some firstIndex, None ->
             let firstCard = state.Cards.[firstIndex]
-            let clickedCard = state.Cards.[index]
-            if firstCard.Symbol = clickedCard.Symbol then
+            let secondCard = state.Cards.[index]
+            if firstCard.Symbol = secondCard.Symbol then
                 // Pair found
-                let rubyText = getRubyText state.Settings.RubyReveal clickedCard.Symbol
+                let rubyText = getRubyText state.Settings.RubyReveal secondCard.Symbol
                 let pairsFound = state.PairsFound + 1
                 let cards =
                     state.Cards
@@ -208,25 +243,31 @@ let update (msg: Msg) (state: Model) =
                         else
                             c)
                 { state with FirstClicked = None
+                             SecondClicked = None
                              PairsFound = pairsFound
                              Cards = cards
                              GameWon = pairsFound = cardsForDifficulty state.Settings.Difficulty / 2
                              RevealedCards = revealed }, Cmd.none
             else
-                // Hide both cards
-                let task() = async {
-                    do! Async.Sleep 1000
-                    return index }
+                { state with RevealedCards = revealed
+                             SecondClicked = Some index }, Cmd.ofSub queueHideCards
 
-                { state with RevealedCards = revealed }, Cmd.OfAsync.perform task () HideCards
+        | None, Some _ ->
+            failwith "Invalid state."
 
-    | HideCards index ->
+    | HideCards ->
         let revealed =
-            state.RevealedCards
-            |> Set.remove index
-            |> Set.remove state.FirstClicked.Value
+            match state.FirstClicked, state.SecondClicked with
+            | Some first, Some second ->
+                state.RevealedCards
+                |> Set.remove first
+                |> Set.remove second
+            | _ ->
+                state.RevealedCards
         
-        { state with FirstClicked = None; RevealedCards = revealed }, Cmd.none
+        { state with FirstClicked = None
+                     SecondClicked = None
+                     RevealedCards = revealed }, Cmd.none
         
     | CreateCards ->
         let deck =
@@ -235,31 +276,30 @@ let update (msg: Msg) (state: Model) =
             |> Seq.map (createCard state.Settings.Game)
             |> Seq.toArray
 
-        let task() = async {
-            do! Async.Sleep 100
-            return 1, deck }
-
-        state, Cmd.OfAsync.perform task () CreateCard
+        state, Cmd.ofSub (queueNextCard 1 deck)
 
     | CreateCard (num, deck) ->
         let randomCard = deck |> getRandomCard (num - 1)
         let newModel = { state with Cards = state.Cards @ [ randomCard ] }
         if num < cardsForDifficulty state.Settings.Difficulty then
-            // Create the next card
-            let task() = async {
-                do! Async.Sleep 100
-                return num + 1, deck }
-
-            newModel, Cmd.OfAsync.perform task () CreateCard
+            newModel, Cmd.ofSub (queueNextCard (num + 1) deck)
         else
             newModel, Cmd.none
 
     | NewGame ->
+        state.NextCardTimeout
+        |> Option.iter Fable.Core.JS.clearTimeout
+        state.HideCardsTimeout
+        |> Option.iter Fable.Core.JS.clearTimeout
+
         { FirstClicked = None
+          SecondClicked = None
           PairsFound = 0
           Cards = []
           RevealedCards = Set.empty
           GameWon = false
+          NextCardTimeout = None
+          HideCardsTimeout = None
           ShowSettings = state.ShowSettings
           Settings = state.Settings },
         Cmd.ofMsg CreateCards
@@ -277,10 +317,13 @@ let init () =
           Difficulty = Easy }
 
     { FirstClicked = None
+      SecondClicked = None
       PairsFound = 0
       Cards = []
       RevealedCards = Set.empty
       GameWon = false
+      NextCardTimeout = None
+      HideCardsTimeout = None
       ShowSettings = false
       Settings = settings },
     Cmd.ofMsg CreateCards

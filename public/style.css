@@ -114,7 +114,7 @@ body {
 .mp-card-back {
   box-shadow: 0 0 1vw #353535;
   border-color: #f8f8f8;
-  background-color: lightcoral;
+  background-color: firebrick;
   transform-style: preserve-3d;
 }
 .mp-gameclear-cont {
