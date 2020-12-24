@@ -4,6 +4,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Symbols.fs" />
+    <Compile Include="Types.fs" />
     <Compile Include="Muistipeli.fs" />
     <Compile Include="Main.fs" />
   </ItemGroup>
