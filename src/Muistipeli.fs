@@ -170,7 +170,7 @@ let update (msg: Msg) (state: Model) =
                 let pairsFound = state.PairsFound + 1
                 let cards =
                     state.Cards
-                    |> List.map (fun c ->
+                    |> Array.map (fun c ->
                         if c.Symbol = firstCard.Symbol then
                             { c with RubyText = rubyText }
                         else
@@ -213,7 +213,7 @@ let update (msg: Msg) (state: Model) =
 
     | CreateCard (num, deck) ->
         let randomCard = deck |> getRandomCard (num - 1)
-        let newModel = { state with Cards = state.Cards @ [ randomCard ] }
+        let newModel = { state with Cards = Array.append state.Cards [| randomCard |] }
         if num < cardsForDifficulty state.Settings.Difficulty then
             newModel, Cmd.ofSub (queueNextCard (num + 1) deck)
         else
@@ -228,7 +228,7 @@ let update (msg: Msg) (state: Model) =
         { FirstClicked = None
           SecondClicked = None
           PairsFound = 0
-          Cards = []
+          Cards = [||]
           KanjiDefinitions = state.KanjiDefinitions
           RevealedCards = Set.empty
           GameWon = false
@@ -243,6 +243,9 @@ let update (msg: Msg) (state: Model) =
 
     | ToggleSettings ->
         { state with ShowSettings = not state.ShowSettings }, Cmd.none
+
+    | HideSettings ->
+        { state with ShowSettings = false }, Cmd.none
         
 let init () =
     let loadDefinitions() = async {
@@ -251,14 +254,14 @@ let init () =
         return if statusCode = 200 then responseText else "" }
 
     let settings =
-        { Game = KanjiGame Level6
+        { Game = KanjiGame Level1
           RubyReveal = Meaning
-          Difficulty = Easy }
+          Difficulty = Normal }
 
     { FirstClicked = None
       SecondClicked = None
       PairsFound = 0
-      Cards = []
+      Cards = [||]
       KanjiDefinitions = Map.empty
       RevealedCards = Set.empty
       GameWon = false
@@ -276,7 +279,9 @@ let view (state: Model) dispatch =
                 Html.div [
                     prop.className "mp-button"
                     prop.text "Uusi peli"
-                    prop.onClick (fun _ -> dispatch NewGame)
+                    prop.onClick (fun _ ->
+                        dispatch HideSettings
+                        dispatch NewGame)
                 ]
 
                 Html.div [
@@ -371,6 +376,7 @@ let view (state: Model) dispatch =
 
         Html.div [
             prop.classes [ "mp-gameboard"; if state.GameWon then "mp-blur" ]
+            prop.onClick (fun _ -> dispatch HideSettings)
             prop.style [
                 let cpr = cardsPerRowForDifficulty state.Settings.Difficulty
                 let totalCards = cardsForDifficulty state.Settings.Difficulty
@@ -383,7 +389,7 @@ let view (state: Model) dispatch =
             ]
             prop.children (
                 state.Cards
-                |> List.mapi (fun i card ->
+                |> Array.mapi (fun i card ->
                     Html.div [
                         prop.classes [ "mp-card"; if state.RevealedCards.Contains i then "flipped" ]
                         prop.style [
@@ -414,7 +420,7 @@ let view (state: Model) dispatch =
                             ]
                             Html.div [
                                 prop.classes [ "mp-side"; "mp-card-back" ]
-                                prop.text (if i % 2 = 0 then Symbols.backIcon1 else Symbols.backIcon2)
+                                prop.text (Symbols.backIcons.[i % 2])
                             ]
                         ]
                     ]

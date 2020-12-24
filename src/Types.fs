@@ -53,7 +53,7 @@ type Model =
     { FirstClicked : int option
       SecondClicked : int option
       PairsFound : int
-      Cards : Card list
+      Cards : Card array
       KanjiDefinitions : Map<string, KanjiDefinition>
       RevealedCards : Set<int>
       GameWon : bool
@@ -70,6 +70,7 @@ type Msg =
     | HideCards
     | UpdateSettings of Settings
     | ToggleSettings
+    | HideSettings
     | SetGameType of GameType
     | SetRevealType of RubyRevealType
     | SetDifficulty of Difficulty
