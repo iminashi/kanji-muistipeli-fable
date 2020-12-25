@@ -6,10 +6,6 @@ open Types
 open Fable.SimpleHttp
 open Thoth.Json
 
-module Option =
-    let ofString str =
-        if System.String.IsNullOrEmpty str then None else Some str
-
 let private formatTime time =
     let hundreths = (time / 100) % 10
     let seconds = time / 1000
@@ -171,8 +167,9 @@ let update (msg: Msg) (state: Model) =
         | Some firstIndex, None ->
             let firstCard = state.Cards.[firstIndex]
             let secondCard = state.Cards.[index]
+
+            // Pair found
             if firstCard.Symbol = secondCard.Symbol then
-                // Pair found
                 let rubyText = getRubyText state.Settings.RubyReveal secondCard.Symbol
                 let pairsFound = state.PairsFound + 1
                 let cards =
@@ -297,184 +294,186 @@ let init () =
       Settings = settings },
     Cmd.OfAsync.perform loadDefinitions () KanjiDefinitionsLoaded
 
-let view (state: Model) dispatch =
-    React.fragment [
-        Html.div [
-            prop.className "mp-gamecontrols"
-            prop.children [
-                Html.div [
-                    prop.className "mp-button"
-                    prop.text "Uusi peli"
-                    prop.onClick (fun _ ->
-                        dispatch HideSettings
-                        dispatch NewGame)
-                ]
+let renderControls state dispatch =
+    Html.div [
+        prop.className "mp-gamecontrols"
+        prop.children [
+            Html.div [
+                prop.className "mp-button"
+                prop.text "Uusi peli"
+                prop.onClick (fun _ ->
+                    dispatch HideSettings
+                    dispatch NewGame)
+            ]
 
-                Html.div [
-                    prop.className "mp-button"
-                    prop.text "Asetukset"
-                    prop.onClick (fun _ -> dispatch ToggleSettings)
-                ]
+            Html.div [
+                prop.className "mp-button"
+                prop.text "Asetukset"
+                prop.onClick (fun _ -> dispatch ToggleSettings)
+            ]
 
+            Html.div [
+                prop.classes [ "mp-slidedown"
+                               "mp-settings"
+                               "mp-shadow"
+                               if state.ShowSettings then "mp-displayed" ]
+                prop.children [
+                    Html.div [
+                        prop.className "mp-opt-cont"
+                        prop.children [
+                            Html.h3 [
+                                prop.className "mp-opt-title"
+                                prop.text "Symbolit"
+                            ]
+                            Html.div [
+                                prop.classes [ "mp-button"; "mp-option"; if state.Settings.Game = EmojiGame then "mp-selected" ]
+                                prop.text "Emoji"
+                                prop.onClick (fun _ -> dispatch (SetGameType EmojiGame))
+                            ]
+
+                            Html.h3 [
+                                prop.className "mp-opt-title"
+                                prop.text "Kanjit"
+                            ]
+                            yield! [ Level1; Level2; Level3; Level4; Level5; Level6; AllLevels ]
+                            |> List.map (fun level ->
+                                Html.div [
+                                    prop.classes [ "mp-button"; "mp-option"; if state.Settings.Game = KanjiGame level then "mp-selected" ]
+                                    prop.text (
+                                        match level with
+                                        | AllLevels -> "Kaikki"
+                                        | lvl -> sprintf "%s. Luokka" ((string lvl).Substring(5))
+                                    )
+                                    prop.onClick (fun _ -> dispatch (SetGameType (KanjiGame level)))
+                                ]
+                            )
+
+                            Html.h3 [
+                                prop.className "mp-opt-title"
+                                prop.text "Näytä"
+                            ]
+                            yield! [ Meaning; Kun; On; Random ]
+                            |> List.map (fun ruby ->
+                                Html.div [
+                                    prop.classes [ "mp-button"; "mp-option"; if state.Settings.RubyReveal = ruby then "mp-selected" ]
+                                    prop.text (
+                                        match ruby with
+                                        | Meaning -> "Merkitys"
+                                        | Random -> "Satunnainen"
+                                        | r -> string r
+                                    )
+                                    prop.onClick (fun _ -> dispatch (SetRevealType ruby))
+                                ]
+                            )
+
+                            Html.h3 [
+                                prop.className "mp-opt-title"
+                                prop.text "Vaikeus"
+                            ]
+                            yield! [ Easy; Normal; Hard; Hardest ]
+                            |> List.map (fun diff ->
+                                Html.div [
+                                    prop.classes [ "mp-button"; "mp-option"; if state.Settings.Difficulty = diff then "mp-selected" ]
+                                    prop.text (
+                                        match diff with
+                                        | Easy -> "Helppo"
+                                        | Normal -> "Normaali"
+                                        | Hard -> "Vaikea"
+                                        | Hardest -> "Vaikein"
+                                    )
+                                    prop.onClick (fun _ -> dispatch (SetDifficulty diff))
+                                ]
+                            )
+                        ]
+                    ]
+                ]
+            ]
+
+            Html.div [
+                prop.className "mp-timer"
+                prop.text (formatTime state.TimeElapsed)
+            ]
+        ]
+    ]
+
+let renderGameBoard state dispatch =
+    Html.div [
+        prop.classes [ "mp-gameboard"; if state.GameWon then "mp-blur" ]
+        prop.onClick (fun _ -> dispatch HideSettings)
+        prop.style [
+            let cpr = cardsPerRowForDifficulty state.Settings.Difficulty
+            let totalCards = cardsForDifficulty state.Settings.Difficulty
+
+            style.custom
+                ("gridTemplateColumns",
+                (sprintf "repeat(%i, auto)" cpr))
+            style.custom
+                ("gridTemplateRows",
+                (sprintf "repeat(%i, auto)" (int <| ceil (float totalCards / float cpr))))
+        ]
+        prop.children (
+            state.Cards
+            |> Array.mapi (fun i card ->
                 Html.div [
-                    prop.classes [ "mp-slidedown"
-                                   "mp-settings"
-                                   "mp-shadow"
-                                   if state.ShowSettings then "mp-displayed" ]
+                    prop.classes [ "mp-card"; if state.RevealedCards.Contains i then "flipped" ]
+                    prop.style [
+                        if state.RevealedCards.Contains i then
+                            style.cursor.defaultCursor
+                    ]
+                    prop.key i
+                    prop.onClick (fun _ -> dispatch (CardClicked i))
                     prop.children [
                         Html.div [
-                            prop.className "mp-opt-cont"
+                            prop.classes [ "mp-side"; "mp-card-front" ]
                             prop.children [
-                                Html.h3 [
-                                    prop.className "mp-opt-title"
-                                    prop.text "Symbolit"
+                                Html.div [
+                                    prop.className "mp-front-symbol"
+                                    prop.text (
+                                        match card.Symbol with
+                                        | Kanji k -> k.Character
+                                        | Emoji e -> e
+                                    )
                                 ]
                                 Html.div [
-                                    prop.classes [ "mp-button"; "mp-option"; if state.Settings.Game = EmojiGame then "mp-selected" ]
-                                    prop.text "Emoji"
-                                    prop.onClick (fun _ -> dispatch (SetGameType EmojiGame))
-                                ]
-
-                                Html.h3 [
-                                    prop.className "mp-opt-title"
-                                    prop.text "Kanjit"
-                                ]
-                                yield! [ Level1; Level2; Level3; Level4; Level5; Level6; AllLevels ]
-                                |> List.map (fun level ->
-                                    Html.div [
-                                        prop.classes [ "mp-button"; "mp-option"; if state.Settings.Game = KanjiGame level then "mp-selected" ]
-                                        prop.text (
-                                            match level with
-                                            | AllLevels -> "Kaikki"
-                                            | lvl -> sprintf "%s. Luokka" ((string lvl).Substring(5))
-                                        )
-                                        prop.onClick (fun _ -> dispatch (SetGameType (KanjiGame level)))
-                                    ]
-                                )
-
-                                Html.h3 [
-                                    prop.className "mp-opt-title"
-                                    prop.text "Näytä"
-                                ]
-                                yield! [ Meaning; Kun; On; Random ]
-                                |> List.map (fun ruby ->
-                                    Html.div [
-                                        prop.classes [ "mp-button"; "mp-option"; if state.Settings.RubyReveal = ruby then "mp-selected" ]
-                                        prop.text (
-                                            match ruby with
-                                            | Meaning -> "Merkitys"
-                                            | Random -> "Satunnainen"
-                                            | r -> string r
-                                        )
-                                        prop.onClick (fun _ -> dispatch (SetRevealType ruby))
-                                    ]
-                                )
-
-                                Html.h3 [
-                                    prop.className "mp-opt-title"
-                                    prop.text "Vaikeus"
-                                ]
-                                yield! [ Easy; Normal; Hard; Hardest ]
-                                |> List.map (fun diff ->
-                                    Html.div [
-                                        prop.classes [ "mp-button"; "mp-option"; if state.Settings.Difficulty = diff then "mp-selected" ]
-                                        prop.text (
-                                            match diff with
-                                            | Easy -> "Helppo"
-                                            | Normal -> "Normaali"
-                                            | Hard -> "Vaikea"
-                                            | Hardest -> "Vaikein"
-                                        )
-                                        prop.onClick (fun _ -> dispatch (SetDifficulty diff))
-                                    ]
-                                )
-                            ]
-                        ]
-                    ]
-                ]
-
-                Html.div [
-                    prop.className "mp-timer"
-                    prop.text (formatTime state.TimeElapsed)
-                ]
-            ]
-        ]
-
-        Html.div [
-            prop.classes [ "mp-gameboard"; if state.GameWon then "mp-blur" ]
-            prop.onClick (fun _ -> dispatch HideSettings)
-            prop.style [
-                let cpr = cardsPerRowForDifficulty state.Settings.Difficulty
-                let totalCards = cardsForDifficulty state.Settings.Difficulty
-                style.custom
-                    ("gridTemplateColumns",
-                    (sprintf "repeat(%i, auto)" cpr))
-                style.custom
-                    ("gridTemplateRows",
-                    (sprintf "repeat(%i, auto)" (int <| ceil (float totalCards / float cpr))))
-            ]
-            prop.children (
-                state.Cards
-                |> Array.mapi (fun i card ->
-                    Html.div [
-                        prop.classes [ "mp-card"; if state.RevealedCards.Contains i then "flipped" ]
-                        prop.style [
-                            if state.RevealedCards.Contains i then
-                                style.cursor.defaultCursor
-                        ]
-                        prop.key i
-                        prop.onClick (fun _ -> dispatch (CardClicked i))
-                        prop.children [
-                            Html.div [
-                                prop.classes [ "mp-side"; "mp-card-front" ]
-                                prop.children [
-                                    Html.div [
-                                        prop.className "mp-front-symbol"
-                                        prop.text (
-                                            match card.Symbol with
-                                            | Kanji k -> k.Character
-                                            | Emoji e -> e
-                                        )
-                                    ]
-                                    Html.div [
-                                        prop.classes [ "mp-ruby"
-                                                       sprintf "mp-ruby-%s" (state.Settings.Difficulty.ToString().ToLower())
-                                                       if card.RubyText.IsSome then "mp-ruby-fadein" ]
-                                        prop.text (Option.toObj card.RubyText)
-                                    ]
+                                    prop.classes [ "mp-ruby"
+                                                   sprintf "mp-ruby-%s" (state.Settings.Difficulty.ToString().ToLower())
+                                                   if card.RubyText.IsSome then "mp-ruby-fadein" ]
+                                    prop.text (Option.toObj card.RubyText)
                                 ]
                             ]
-                            Html.div [
-                                prop.classes [ "mp-side"; "mp-card-back" ]
-                                prop.text (Symbols.backIcons.[i % 2])
-                            ]
-                        ]
-                    ]
-                ))
-        ]
-
-        Html.div [
-            prop.className "mp-gameclear-cont"
-            prop.style [
-                if state.GameWon then
-                    style.display.flex
-                else
-                    style.display.none
-            ]
-            prop.children [
-                Html.div [
-                    prop.classes [ "mp-clearmessage"; "mp-shadow" ]
-                    prop.children [
-                        Html.p [
-                            prop.text "Kaikki parit löydetty!"
                         ]
                         Html.div [
-                            prop.className "mp-button"
-                            prop.text "OK"
-                            prop.onClick (fun _ -> dispatch NewGame)
+                            prop.classes [ "mp-side"; "mp-card-back" ]
+                            prop.text (Symbols.backIcons.[i % 2])
                         ]
+                    ]
+                ]
+            ))
+    ]
+
+let renderGameClearMessage dispatch =
+    Html.div [
+        prop.className "mp-gameclear-cont"
+        prop.children [
+            Html.div [
+                prop.classes [ "mp-clearmessage"; "mp-shadow" ]
+                prop.children [
+                    Html.p [
+                        prop.text "Kaikki parit löydetty!"
+                    ]
+                    Html.div [
+                        prop.className "mp-button"
+                        prop.text "OK"
+                        prop.onClick (fun _ -> dispatch NewGame)
                     ]
                 ]
             ]
         ]
+    ]
+
+let view (state: Model) dispatch =
+    React.fragment [
+        renderControls state dispatch
+        renderGameBoard state dispatch
+        if state.GameWon then renderGameClearMessage dispatch
     ]

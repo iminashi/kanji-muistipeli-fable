@@ -3,6 +3,7 @@
     <TargetFramework>net5.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="Extensions.fs" />
     <Compile Include="Symbols.fs" />
     <Compile Include="Types.fs" />
     <Compile Include="Muistipeli.fs" />

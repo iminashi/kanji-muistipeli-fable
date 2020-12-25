@@ -58,9 +58,9 @@ type Model =
       RevealedCards : Set<int>
       GameWon : bool
       ShowSettings : bool
+      TimerOn : bool
       NextCardTimeout : int option
       HideCardsTimeout : int option
-      TimerOn : bool
       TimeElapsed : int
       Settings : Settings }
 
