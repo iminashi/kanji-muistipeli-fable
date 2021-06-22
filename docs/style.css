@@ -1,0 +1,257 @@
+@charset "UTF-8";
+@import url('https://fonts.googleapis.com/css?family=Varela+Round|VT323|Ubuntu+Mono');
+@keyframes newcard {
+  from {
+    transform: translateX(-180px) translateY(-280px) rotateZ(-15deg);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0px) translateY(0px) rotateZ(0deg);
+    opacity: 1;
+  }
+}
+@keyframes fadein {
+  from {
+    opacity: 0;
+    transform: scale(2.5, 2.5);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1, 1);
+  }
+}
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+body {
+  margin: 0;
+  height: auto;
+}
+.mp-gameboard {
+  display: grid;
+  grid-template-columns: auto auto auto auto;
+  gap: 1vmax;
+  padding: 5px;
+  margin: 3px;
+  width: 98%;
+  height: 90vh;
+  overflow: hidden;
+  background-color: #b19779;
+  background: radial-gradient(#d7c9b9, #b19779);
+  margin-left: auto;
+  margin-right: auto;
+  border: 0.5vw ridge gray;
+}
+.flipped {
+  transform: rotateY(180deg);
+}
+.mp-card {
+  animation: newcard 0.5s ease-out;
+  user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  -webkit-user-select: none;
+  font-size: 6vmin;
+  transition: transform 0.5s ease-out;
+  transform-style: preserve-3d;
+  cursor: pointer;
+}
+.mp-side {
+  backface-visibility: hidden;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  border-radius: 10%;
+  border: 0.3vw solid black;
+  font-family: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", "Android Emoji";
+}
+.mp-card-front {
+  background: white;
+  background: linear-gradient(to bottom right, lightgray, white);
+  color: black;
+  transform: rotateY(180deg);
+}
+.mp-front-symbol {
+  transition: color 0.5s ease-out;
+  font-weight: bold;
+}
+.mp-ruby-easy {
+  font-size: 5vmin;
+  top: 1.1vmin;
+}
+.mp-ruby-normal {
+  font-size: 4vmin;
+  top: 1.5vmin;
+}
+.mp-ruby-hard {
+  font-size: 3.3vmin;
+  top: 0.7vmin;
+}
+.mp-ruby-hardest {
+  font-size: 2.7vmin;
+  top: 0.5vmin;
+}
+.mp-ruby {
+  position: absolute;
+  display: none;
+  color: black;
+  text-shadow: 0px 0px 6px white;
+  font-family: 'Varela Round', sans-serif;
+}
+.mp-ruby-fadein {
+  animation: fadein 0.4s ease-out;
+  display: flex;
+}
+.mp-card-back {
+  box-shadow: 0 0 1vw #353535;
+  border-color: #f8f8f8;
+  background-color: firebrick;
+  transform-style: preserve-3d;
+}
+.mp-gameclear-cont {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  background-color: rgba(0, 0, 0, 0.35);
+  z-index: 100;
+}
+.mp-clearmessage {
+  font-size: 4vmin;
+  font-family: sans-serif;
+  text-align: center;
+  background-color: whitesmoke;
+  padding: 3vmin;
+  max-width: 60%;
+  border: 0.5vmin outset #fff;
+  font-family: 'Varela Round', sans-serif;
+}
+.mp-newrecordtext {
+  font-size: 5vmin;
+  color: red;
+  display: none;
+}
+.mp-gamecontrols {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 9vmin;
+}
+.mp-button {
+  user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  -webkit-user-select: none;
+  font-family: 'Varela Round', sans-serif;
+  font-size: 3.5vmin;
+  border: 0.4vmin solid #e7e7e7;
+  border-radius: 5px;
+  background-color: #e7e7e7;
+  cursor: pointer;
+  margin: 0.2vmin;
+  padding-top: 1vmin;
+  padding-bottom: 1vmin;
+  padding-left: 3vmin;
+  padding-right: 3vmin;
+  transition: background-color 0.5s;
+}
+.mp-button:hover {
+  background-color: #c1c1c1;
+}
+.mp-slidedown {
+  display: none;
+  border: 1px solid black;
+  border-bottom-left-radius: 15px;
+  border-bottom-right-radius: 15px;
+  background-color: rgba(245, 245, 245, 0.98);
+  z-index: 20;
+  position: absolute;
+}
+.mp-settings {
+  padding: 1vmin;
+}
+.mp-settings h3 {
+  font-family: 'Lucida Sans', 'Lucida Sans Regular', sans-serif;
+  font-size: 3vmin;
+  text-align: left;
+  padding: 0;
+  margin: 0;
+  margin-bottom: 2px;
+  border-bottom: 1px dashed #a1a1a1;
+}
+.mp-opt-cont {
+  display: grid;
+  grid-template-columns: auto auto auto;
+}
+.mp-opt-cont div {
+  text-align: center;
+}
+.mp-opt-title {
+  grid-column: 1 / span 3;
+}
+.mp-option {
+  font-size: 3vmin;
+  border: 0.4vmin solid white;
+  border-radius: 5px;
+  padding-bottom: 0.5vmin;
+  padding-top: 0.5vmin;
+  background-color: white;
+}
+.mp-option:hover {
+  background-color: #bf9fdf;
+}
+.mp-selected {
+  background-color: rgba(102, 51, 153, 0.2);
+  border: 0.4vmin solid rebeccapurple;
+  border-radius: 5px;
+}
+.mp-selected:hover {
+  background-color: rgba(102, 51, 153, 0.2);
+}
+.mp-shadow {
+  box-shadow: 5px 5px 4px 1px rgba(49, 49, 49, 0.671);
+}
+.mp-timer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 0 1vmin 0 1vmin;
+  margin-left: 1vmin;
+  border: 1vmin groove #adadad;
+  border-radius: 7px;
+  background-color: black;
+  color: white;
+  float: left;
+  font-size: 3.8vmin;
+  font-family: 'Ubuntu Mono', monospace;
+}
+#debug {
+  width: 100%;
+  display: none;
+  clear: both;
+  padding-top: 10px;
+}
+.mp-hide {
+  display: none;
+}
+.mp-blur {
+  filter: blur(1px)
+}
+.mp-displayed {
+  display: block;
+  top: 9vh;
+}
