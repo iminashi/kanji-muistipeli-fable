@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "webpack serve"
+    "start": "dotnet fable watch src --run \"webpack serve\""
   },
   "author": "",
   "license": "ISC",
