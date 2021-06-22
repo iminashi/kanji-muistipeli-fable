@@ -216,19 +216,16 @@ let update (msg: Msg) (state: Model) =
             |> Seq.map (createCard state.Settings.Game state.KanjiDefinitions)
             |> Seq.toArray
 
-        { state with TimerOn = true },
-        Cmd.batch [ Cmd.ofSub (queueNextCard 1 deck)
-                    Cmd.ofMsg TimerTick ]
+        state, Cmd.ofSub (queueNextCard 1 deck)
 
     | TimerTick ->
-        let cmd =
-            if state.TimerOn then
-                let task() = async { do! Async.Sleep 100 }
-                Cmd.OfAsync.perform task () (fun _ -> TimerTick)
-            else
-                Cmd.none
-
-        { state with TimeElapsed = state.TimeElapsed + 100 }, cmd
+        if state.TimerOn then
+            let task = async {
+                do! Async.Sleep 100
+                return TimerTick }
+            { state with TimeElapsed = state.TimeElapsed + 100 }, Cmd.OfAsync.result task
+        else
+            state, Cmd.none
 
     | CreateCard (num, deck) ->
         let randomCard = deck |> getRandomCard (num - 1)
@@ -236,7 +233,7 @@ let update (msg: Msg) (state: Model) =
         if num < cardsForDifficulty state.Settings.Difficulty then
             newModel, Cmd.ofSub (queueNextCard (num + 1) deck)
         else
-            newModel, Cmd.none
+            { newModel with TimerOn = true }, Cmd.ofMsg TimerTick
 
     | NewGame ->
         state.NextCardTimeout
