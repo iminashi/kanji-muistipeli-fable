@@ -267,7 +267,7 @@ let update (msg: Msg) (state: Model) =
         
 let init () =
     let loadDefinitions() = async {
-        let! statusCode, responseText = Http.get "/kanji.json"
+        let! statusCode, responseText = Http.get "kanji.json"
         // TODO: Error handling
         return if statusCode = 200 then responseText else "" }
 
