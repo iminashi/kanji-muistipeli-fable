@@ -23,15 +23,15 @@ let private getKanjiArray = function
     | AllLevels -> Array.concat Symbols.kanjiLevels
 
 let private cardsForDifficulty = function
-    | Easy -> 12
-    | Normal -> 20
-    | Hard -> 30
+    | Easy    -> 12
+    | Normal  -> 20
+    | Hard    -> 30
     | Hardest -> 42
 
 let private cardsPerRowForDifficulty = function
-    | Easy -> 3
-    | Normal -> 5
-    | Hard -> 6
+    | Easy    -> 3
+    | Normal  -> 5
+    | Hard    -> 6
     | Hardest -> 7
 
 let private swap i1 i2 (arr : 'a array) =
@@ -81,22 +81,26 @@ let private createCard gameType kanjiDefs character =
         | KanjiGame _ -> createKanji kanjiDefs character
     { Symbol = symbol; RubyText = None }
 
+let private rand = System.Random()
+
 let rec private getRubyText reveal symbol =
     match symbol with
-    | Emoji _ -> None
+    | Emoji _ ->
+        None
     | Kanji kanji ->
         let orElse alternative preferred =
             preferred 
             |> Option.orElse alternative
-            |> Option.defaultValue "MISSING READING"
-            |> Some
+            |> Option.orElse (Some "MISSING READING")
 
         match reveal with
-        | Kun -> kanji.Kun |> orElse kanji.On
-        | On -> kanji.On |> orElse kanji.Kun
-        | Meaning -> Some kanji.Meaning
+        | Kun ->
+            kanji.Kun |> orElse kanji.On
+        | On ->
+            kanji.On |> orElse kanji.Kun
+        | Meaning ->
+            Some kanji.Meaning
         | Random ->
-            let rand = System.Random()
             let rb =
                 match rand.Next(0, 3) with
                 | 0 -> Kun
@@ -111,6 +115,32 @@ let private queueNextCard index deck dispatch =
 let private queueHideCards dispatch =
     let id = Fable.Core.JS.setTimeout (fun _ -> dispatch HideCards) 1000
     dispatch (SetHideCardsTimeout id)
+
+let init () =
+    let loadDefinitions() = async {
+        let! statusCode, responseText = Http.get "kanji.json"
+        // TODO: Error handling
+        return if statusCode = 200 then responseText else "" }
+
+    let settings =
+        { Game = KanjiGame Level1
+          RubyReveal = Meaning
+          Difficulty = Normal }
+
+    { FirstClicked = None
+      SecondClicked = None
+      PairsFound = 0
+      Cards = Array.empty
+      KanjiDefinitions = Map.empty
+      RevealedCards = Set.empty
+      GameWon = false
+      NextCardTimeout = None
+      HideCardsTimeout = None
+      TimerOn = false
+      TimeElapsed = 0
+      ShowSettings = false
+      Settings = settings },
+    Cmd.OfAsync.perform loadDefinitions () KanjiDefinitionsLoaded
 
 let update (msg: Msg) (state: Model) =
     match msg with
@@ -264,32 +294,6 @@ let update (msg: Msg) (state: Model) =
 
     | HideSettings ->
         { state with ShowSettings = false }, Cmd.none
-        
-let init () =
-    let loadDefinitions() = async {
-        let! statusCode, responseText = Http.get "kanji.json"
-        // TODO: Error handling
-        return if statusCode = 200 then responseText else "" }
-
-    let settings =
-        { Game = KanjiGame Level1
-          RubyReveal = Meaning
-          Difficulty = Normal }
-
-    { FirstClicked = None
-      SecondClicked = None
-      PairsFound = 0
-      Cards = [||]
-      KanjiDefinitions = Map.empty
-      RevealedCards = Set.empty
-      GameWon = false
-      NextCardTimeout = None
-      HideCardsTimeout = None
-      TimerOn = false
-      TimeElapsed = 0
-      ShowSettings = false
-      Settings = settings },
-    Cmd.OfAsync.perform loadDefinitions () KanjiDefinitionsLoaded
 
 let renderControls state dispatch =
     Html.div [
