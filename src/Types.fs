@@ -34,20 +34,21 @@ type Kanji =
     { Character : string
       Kun : string option
       On : string option
-      Meaning : string }
+      Meaning : string
+      RubyText : string option }
 
 type KanjiDefinition =
     { Kun : string
       On : string
       Meaning : string }
 
-type Symbol =
+type Card =
     | Emoji of string
     | Kanji of Kanji
-
-type Card =
-    { Symbol : Symbol
-      RubyText : string option }
+    member this.Symbol =
+        match this with
+        | Emoji e -> e
+        | Kanji k -> k.Character
 
 type Model =
     { FirstClicked : int option
@@ -62,7 +63,8 @@ type Model =
       NextCardTimeout : int option
       HideCardsTimeout : int option
       TimeElapsed : int
-      Settings : Settings }
+      Settings : Settings
+      ErrorMessage : string option }
 
 type Msg =
     | CardClicked of index : int
@@ -79,4 +81,4 @@ type Msg =
     | SetDifficulty of Difficulty
     | SetNextCardTimeout of int
     | SetHideCardsTimeout of int
-    | KanjiDefinitionsLoaded of string
+    | KanjiDefinitionsLoaded of Result<string, int * string>

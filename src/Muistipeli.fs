@@ -23,15 +23,15 @@ let private getKanjiArray = function
     | AllLevels -> Array.concat Symbols.kanjiLevels
 
 let private cardsForDifficulty = function
-    | Easy -> 12
-    | Normal -> 20
-    | Hard -> 30
+    | Easy    -> 12
+    | Normal  -> 20
+    | Hard    -> 30
     | Hardest -> 42
 
 let private cardsPerRowForDifficulty = function
-    | Easy -> 3
-    | Normal -> 5
-    | Hard -> 6
+    | Easy    -> 3
+    | Normal  -> 5
+    | Hard    -> 6
     | Hardest -> 7
 
 let private swap i1 i2 (arr : 'a array) =
@@ -72,37 +72,36 @@ let private createKanji kanjiDefs character =
     Kanji { Character = character
             Kun = Option.ofString def.Kun
             On = Option.ofString def.On
-            Meaning = def.Meaning }
+            Meaning = def.Meaning
+            RubyText = None }
 
 let private createCard gameType kanjiDefs character =
-    let symbol =
-        match gameType with
-        | EmojiGame -> Emoji character
-        | KanjiGame _ -> createKanji kanjiDefs character
-    { Symbol = symbol; RubyText = None }
+    match gameType with
+    | EmojiGame -> Emoji character
+    | KanjiGame _ -> createKanji kanjiDefs character
 
-let rec private getRubyText reveal symbol =
-    match symbol with
-    | Emoji _ -> None
-    | Kanji kanji ->
-        let orElse alternative preferred =
-            preferred 
-            |> Option.orElse alternative
-            |> Option.defaultValue "MISSING READING"
-            |> Some
+let private rand = System.Random()
 
-        match reveal with
-        | Kun -> kanji.Kun |> orElse kanji.On
-        | On -> kanji.On |> orElse kanji.Kun
-        | Meaning -> Some kanji.Meaning
-        | Random ->
-            let rand = System.Random()
-            let rb =
-                match rand.Next(0, 3) with
-                | 0 -> Kun
-                | 1 -> On
-                | _ -> Meaning
-            getRubyText rb symbol
+let rec private getRubyText reveal (kanji: Kanji) =
+    let orElse alternative preferred =
+        preferred 
+        |> Option.orElse alternative
+        |> Option.defaultValue "MISSING READING"
+
+    match reveal with
+    | Kun ->
+        kanji.Kun |> orElse kanji.On
+    | On ->
+        kanji.On |> orElse kanji.Kun
+    | Meaning ->
+        kanji.Meaning
+    | Random ->
+        let rb =
+            match rand.Next(0, 3) with
+            | 0 -> Kun
+            | 1 -> On
+            | _ -> Meaning
+        getRubyText rb kanji
 
 let private queueNextCard index deck dispatch =
     let id = Fable.Core.JS.setTimeout (fun _ -> dispatch (CreateCard(index, deck))) 100
@@ -112,15 +111,48 @@ let private queueHideCards dispatch =
     let id = Fable.Core.JS.setTimeout (fun _ -> dispatch HideCards) 1000
     dispatch (SetHideCardsTimeout id)
 
+let init () =
+    let loadDefinitions() = async {
+        let! statusCode, responseText = Http.get "kanji.json"
+        return
+            if statusCode = 200 then
+                Ok responseText
+            else
+                Error(statusCode, responseText) }
+
+    let settings =
+        { Game = KanjiGame Level1
+          RubyReveal = Meaning
+          Difficulty = Normal }
+
+    { FirstClicked = None
+      SecondClicked = None
+      PairsFound = 0
+      Cards = Array.empty
+      KanjiDefinitions = Map.empty
+      RevealedCards = Set.empty
+      GameWon = false
+      NextCardTimeout = None
+      HideCardsTimeout = None
+      TimerOn = false
+      TimeElapsed = 0
+      ShowSettings = false
+      Settings = settings
+      ErrorMessage = None },
+    Cmd.OfAsync.perform loadDefinitions () KanjiDefinitionsLoaded
+
 let update (msg: Msg) (state: Model) =
     match msg with
     | KanjiDefinitionsLoaded kanji ->
-        match Decode.fromString (Decode.dict kanjiDecoder) kanji with
-        | Ok defs ->
-            { state with KanjiDefinitions = defs }, Cmd.ofMsg CreateCards
-        | Error _ ->
-            // TODO
-            state, Cmd.none
+        match kanji with
+        | Error (code, message) ->
+            { state with ErrorMessage = Some $"Kanjimerkkien lataaminen epäonnistui virhekoodilla {code}:\n{message}"}, Cmd.none
+        | Ok kanjiDefinitions ->
+            match Decode.fromString (Decode.dict kanjiDecoder) kanjiDefinitions with
+            | Ok defs ->
+                { state with KanjiDefinitions = defs }, Cmd.ofMsg CreateCards
+            | Error error ->
+                { state with ErrorMessage = Some $"Kanjimerkkien lataaminen epäonnistui. Virhe:\n{error}"}, Cmd.none
 
     | SetNextCardTimeout id ->
         { state with NextCardTimeout = Some id }, Cmd.none
@@ -144,6 +176,11 @@ let update (msg: Msg) (state: Model) =
         let revealed = state.RevealedCards.Add index
 
         match state.FirstClicked, state.SecondClicked with
+        | None, None ->
+            { state with FirstClicked = Some index
+                         RevealedCards = revealed
+                         HideCardsTimeout = None }, Cmd.none
+
         | Some firstIndex, Some secondIndex ->
             state.HideCardsTimeout
             |> Option.iter Fable.Core.JS.clearTimeout
@@ -159,26 +196,27 @@ let update (msg: Msg) (state: Model) =
                          SecondClicked = None
                          RevealedCards = revealed
                          HideCardsTimeout = None }, Cmd.none
-        | None, None ->
-            { state with FirstClicked = Some index
-                         RevealedCards = revealed
-                         HideCardsTimeout = None }, Cmd.none
 
         | Some firstIndex, None ->
             let firstCard = state.Cards.[firstIndex]
             let secondCard = state.Cards.[index]
 
             // Pair found
-            if firstCard.Symbol = secondCard.Symbol then
-                let rubyText = getRubyText state.Settings.RubyReveal secondCard.Symbol
-                let pairsFound = state.PairsFound + 1
+            if firstCard = secondCard then
                 let cards =
-                    state.Cards
-                    |> Array.map (fun c ->
-                        if c.Symbol = firstCard.Symbol then
-                            { c with RubyText = rubyText }
-                        else
-                            c)
+                    match firstCard with
+                    | Emoji _ ->
+                        state.Cards
+                    | Kanji kanji ->
+                        let rubyText = getRubyText state.Settings.RubyReveal kanji
+                        state.Cards
+                        |> Array.map (fun card ->
+                            match card with
+                            | Kanji k when k.Character = kanji.Character ->
+                                Kanji { k with RubyText = Some rubyText }
+                            | other ->
+                                other)
+                let pairsFound = state.PairsFound + 1
                 let gameWon = pairsFound = cardsForDifficulty state.Settings.Difficulty / 2
 
                 { state with FirstClicked = None
@@ -244,7 +282,7 @@ let update (msg: Msg) (state: Model) =
         { FirstClicked = None
           SecondClicked = None
           PairsFound = 0
-          Cards = [||]
+          Cards = Array.empty
           KanjiDefinitions = state.KanjiDefinitions
           RevealedCards = Set.empty
           GameWon = false
@@ -253,7 +291,8 @@ let update (msg: Msg) (state: Model) =
           TimerOn = false
           TimeElapsed = 0
           ShowSettings = state.ShowSettings
-          Settings = state.Settings },
+          Settings = state.Settings
+          ErrorMessage = None },
         Cmd.ofMsg CreateCards
 
     | UpdateSettings newSettings ->
@@ -264,32 +303,76 @@ let update (msg: Msg) (state: Model) =
 
     | HideSettings ->
         { state with ShowSettings = false }, Cmd.none
-        
-let init () =
-    let loadDefinitions() = async {
-        let! statusCode, responseText = Http.get "/kanji.json"
-        // TODO: Error handling
-        return if statusCode = 200 then responseText else "" }
 
-    let settings =
-        { Game = KanjiGame Level1
-          RubyReveal = Meaning
-          Difficulty = Normal }
+let renderSettings state dispatch =
+    Html.div [
+        prop.className "mp-opt-cont"
+        prop.children [
+            Html.h3 [
+                prop.className "mp-opt-title"
+                prop.text "Symbolit"
+            ]
+            Html.div [
+                prop.classes [ "mp-button"; "mp-option"; if state.Settings.Game = EmojiGame then "mp-selected" ]
+                prop.text "Emoji"
+                prop.onClick (fun _ -> dispatch (SetGameType EmojiGame))
+            ]
 
-    { FirstClicked = None
-      SecondClicked = None
-      PairsFound = 0
-      Cards = [||]
-      KanjiDefinitions = Map.empty
-      RevealedCards = Set.empty
-      GameWon = false
-      NextCardTimeout = None
-      HideCardsTimeout = None
-      TimerOn = false
-      TimeElapsed = 0
-      ShowSettings = false
-      Settings = settings },
-    Cmd.OfAsync.perform loadDefinitions () KanjiDefinitionsLoaded
+            Html.h3 [
+                prop.className "mp-opt-title"
+                prop.text "Kanjit"
+            ]
+            yield! [ Level1; Level2; Level3; Level4; Level5; Level6; AllLevels ]
+            |> List.map (fun level ->
+                Html.div [
+                    prop.classes [ "mp-button"; "mp-option"; if state.Settings.Game = KanjiGame level then "mp-selected" ]
+                    prop.text (
+                        match level with
+                        | AllLevels -> "Kaikki"
+                        | lvl -> sprintf "%s. Luokka" ((string lvl).Substring(5))
+                    )
+                    prop.onClick (fun _ -> dispatch (SetGameType (KanjiGame level)))
+                ]
+            )
+
+            Html.h3 [
+                prop.className "mp-opt-title"
+                prop.text "Näytä"
+            ]
+            yield! [ Meaning; Kun; On; Random ]
+            |> List.map (fun ruby ->
+                Html.div [
+                    prop.classes [ "mp-button"; "mp-option"; if state.Settings.RubyReveal = ruby then "mp-selected" ]
+                    prop.text (
+                        match ruby with
+                        | Meaning -> "Merkitys"
+                        | Random -> "Satunnainen"
+                        | other -> string other
+                    )
+                    prop.onClick (fun _ -> dispatch (SetRevealType ruby))
+                ]
+            )
+
+            Html.h3 [
+                prop.className "mp-opt-title"
+                prop.text "Vaikeus"
+            ]
+            yield! [ Easy; Normal; Hard; Hardest ]
+            |> List.map (fun diff ->
+                Html.div [
+                    prop.classes [ "mp-button"; "mp-option"; if state.Settings.Difficulty = diff then "mp-selected" ]
+                    prop.text (
+                        match diff with
+                        | Easy -> "Helppo"
+                        | Normal -> "Normaali"
+                        | Hard -> "Vaikea"
+                        | Hardest -> "Vaikein"
+                    )
+                    prop.onClick (fun _ -> dispatch (SetDifficulty diff))
+                ]
+            )
+        ]
+    ]
 
 let renderControls state dispatch =
     Html.div [
@@ -315,74 +398,7 @@ let renderControls state dispatch =
                                "mp-shadow"
                                if state.ShowSettings then "mp-displayed" ]
                 prop.children [
-                    Html.div [
-                        prop.className "mp-opt-cont"
-                        prop.children [
-                            Html.h3 [
-                                prop.className "mp-opt-title"
-                                prop.text "Symbolit"
-                            ]
-                            Html.div [
-                                prop.classes [ "mp-button"; "mp-option"; if state.Settings.Game = EmojiGame then "mp-selected" ]
-                                prop.text "Emoji"
-                                prop.onClick (fun _ -> dispatch (SetGameType EmojiGame))
-                            ]
-
-                            Html.h3 [
-                                prop.className "mp-opt-title"
-                                prop.text "Kanjit"
-                            ]
-                            yield! [ Level1; Level2; Level3; Level4; Level5; Level6; AllLevels ]
-                            |> List.map (fun level ->
-                                Html.div [
-                                    prop.classes [ "mp-button"; "mp-option"; if state.Settings.Game = KanjiGame level then "mp-selected" ]
-                                    prop.text (
-                                        match level with
-                                        | AllLevels -> "Kaikki"
-                                        | lvl -> sprintf "%s. Luokka" ((string lvl).Substring(5))
-                                    )
-                                    prop.onClick (fun _ -> dispatch (SetGameType (KanjiGame level)))
-                                ]
-                            )
-
-                            Html.h3 [
-                                prop.className "mp-opt-title"
-                                prop.text "Näytä"
-                            ]
-                            yield! [ Meaning; Kun; On; Random ]
-                            |> List.map (fun ruby ->
-                                Html.div [
-                                    prop.classes [ "mp-button"; "mp-option"; if state.Settings.RubyReveal = ruby then "mp-selected" ]
-                                    prop.text (
-                                        match ruby with
-                                        | Meaning -> "Merkitys"
-                                        | Random -> "Satunnainen"
-                                        | r -> string r
-                                    )
-                                    prop.onClick (fun _ -> dispatch (SetRevealType ruby))
-                                ]
-                            )
-
-                            Html.h3 [
-                                prop.className "mp-opt-title"
-                                prop.text "Vaikeus"
-                            ]
-                            yield! [ Easy; Normal; Hard; Hardest ]
-                            |> List.map (fun diff ->
-                                Html.div [
-                                    prop.classes [ "mp-button"; "mp-option"; if state.Settings.Difficulty = diff then "mp-selected" ]
-                                    prop.text (
-                                        match diff with
-                                        | Easy -> "Helppo"
-                                        | Normal -> "Normaali"
-                                        | Hard -> "Vaikea"
-                                        | Hardest -> "Vaikein"
-                                    )
-                                    prop.onClick (fun _ -> dispatch (SetDifficulty diff))
-                                ]
-                            )
-                        ]
-                    ]
+                    renderSettings state dispatch
                 ]
             ]
 
@@ -393,59 +409,59 @@ let renderControls state dispatch =
         ]
     ]
 
+let renderCard state dispatch index (card: Card) =
+    let isRevealed = state.RevealedCards.Contains index
+    Html.div [
+        prop.classes [ "mp-card"; if isRevealed then "flipped" ]
+        prop.style [ if isRevealed then style.cursor.defaultCursor ]
+        prop.key index
+        prop.onClick (fun _ -> if not isRevealed then dispatch (CardClicked index))
+        prop.children [
+            Html.div [
+                prop.classes [ "mp-side"; "mp-card-front" ]
+                prop.children [
+                    Html.div [
+                        prop.className "mp-front-symbol"
+                        prop.text card.Symbol
+                    ]
+                    match card with
+                    | Kanji { RubyText = Some ruby } ->
+                        Html.div [
+                            prop.classes [ "mp-ruby"
+                                           sprintf "mp-ruby-%s" (state.Settings.Difficulty.ToString().ToLower())
+                                           "mp-ruby-fadein" ]
+                            prop.text ruby
+                        ]
+                    | _ ->
+                        ()
+                ]
+            ]
+            Html.div [
+                prop.classes [ "mp-side"; "mp-card-back" ]
+                prop.text (Symbols.backIcons.[index % 2])
+            ]
+        ]
+    ]
+
 let renderGameBoard state dispatch =
     Html.div [
         prop.classes [ "mp-gameboard"; if state.GameWon then "mp-blur" ]
-        prop.onClick (fun _ -> dispatch HideSettings)
+        prop.onClick (fun _ -> if state.ShowSettings then dispatch HideSettings)
         prop.style [
-            let cpr = cardsPerRowForDifficulty state.Settings.Difficulty
+            let perRow = cardsPerRowForDifficulty state.Settings.Difficulty
             let totalCards = cardsForDifficulty state.Settings.Difficulty
 
             style.custom
                 ("gridTemplateColumns",
-                (sprintf "repeat(%i, auto)" cpr))
+                (sprintf "repeat(%i, auto)" perRow))
             style.custom
                 ("gridTemplateRows",
-                (sprintf "repeat(%i, auto)" (int <| ceil (float totalCards / float cpr))))
+                (sprintf "repeat(%i, auto)" (int <| ceil (float totalCards / float perRow))))
         ]
         prop.children (
             state.Cards
-            |> Array.mapi (fun i card ->
-                Html.div [
-                    prop.classes [ "mp-card"; if state.RevealedCards.Contains i then "flipped" ]
-                    prop.style [
-                        if state.RevealedCards.Contains i then
-                            style.cursor.defaultCursor
-                    ]
-                    prop.key i
-                    prop.onClick (fun _ -> dispatch (CardClicked i))
-                    prop.children [
-                        Html.div [
-                            prop.classes [ "mp-side"; "mp-card-front" ]
-                            prop.children [
-                                Html.div [
-                                    prop.className "mp-front-symbol"
-                                    prop.text (
-                                        match card.Symbol with
-                                        | Kanji k -> k.Character
-                                        | Emoji e -> e
-                                    )
-                                ]
-                                Html.div [
-                                    prop.classes [ "mp-ruby"
-                                                   sprintf "mp-ruby-%s" (state.Settings.Difficulty.ToString().ToLower())
-                                                   if card.RubyText.IsSome then "mp-ruby-fadein" ]
-                                    prop.text (Option.toObj card.RubyText)
-                                ]
-                            ]
-                        ]
-                        Html.div [
-                            prop.classes [ "mp-side"; "mp-card-back" ]
-                            prop.text (Symbols.backIcons.[i % 2])
-                        ]
-                    ]
-                ]
-            ))
+            |> Array.mapi (renderCard state dispatch)
+        )
     ]
 
 let renderGameClearMessage dispatch =
@@ -470,6 +486,18 @@ let renderGameClearMessage dispatch =
 
 let view (state: Model) dispatch =
     React.fragment [
+        match state.ErrorMessage with
+        | Some errorMessage ->
+            Html.div [
+                prop.className "error"
+                prop.children [
+                    Html.strong [
+                        prop.text errorMessage
+                    ]
+                ]
+            ]
+        | None ->
+            ()
         renderControls state dispatch
         renderGameBoard state dispatch
         if state.GameWon then renderGameClearMessage dispatch
