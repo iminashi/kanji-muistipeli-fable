@@ -49,16 +49,17 @@ body {
 }
 .mp-card {
   animation: newcard 0.5s ease-out;
-  user-select: none;
   -moz-user-select: none;
   -ms-user-select: none;
   -webkit-user-select: none;
+  user-select: none;
   font-size: 6vmin;
   transition: transform 0.5s ease-out;
   transform-style: preserve-3d;
   cursor: pointer;
 }
 .mp-side {
+  -webkit-backface-visibility: hidden;
   backface-visibility: hidden;
   display: flex;
   justify-content: center;
@@ -152,10 +153,10 @@ body {
   height: 9vmin;
 }
 .mp-button {
-  user-select: none;
   -moz-user-select: none;
   -ms-user-select: none;
   -webkit-user-select: none;
+  user-select: none;
   font-family: 'Varela Round', sans-serif;
   font-size: 3.5vmin;
   border: 0.4vmin solid #e7e7e7;
