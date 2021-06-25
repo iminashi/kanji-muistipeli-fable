@@ -72,41 +72,36 @@ let private createKanji kanjiDefs character =
     Kanji { Character = character
             Kun = Option.ofString def.Kun
             On = Option.ofString def.On
-            Meaning = def.Meaning }
+            Meaning = def.Meaning
+            RubyText = None }
 
 let private createCard gameType kanjiDefs character =
-    let symbol =
-        match gameType with
-        | EmojiGame -> Emoji character
-        | KanjiGame _ -> createKanji kanjiDefs character
-    { Symbol = symbol; RubyText = None }
+    match gameType with
+    | EmojiGame -> Emoji character
+    | KanjiGame _ -> createKanji kanjiDefs character
 
 let private rand = System.Random()
 
-let rec private getRubyText reveal symbol =
-    match symbol with
-    | Emoji _ ->
-        None
-    | Kanji kanji ->
-        let orElse alternative preferred =
-            preferred 
-            |> Option.orElse alternative
-            |> Option.orElse (Some "MISSING READING")
+let rec private getRubyText reveal (kanji: Kanji) =
+    let orElse alternative preferred =
+        preferred 
+        |> Option.orElse alternative
+        |> Option.defaultValue "MISSING READING"
 
-        match reveal with
-        | Kun ->
-            kanji.Kun |> orElse kanji.On
-        | On ->
-            kanji.On |> orElse kanji.Kun
-        | Meaning ->
-            Some kanji.Meaning
-        | Random ->
-            let rb =
-                match rand.Next(0, 3) with
-                | 0 -> Kun
-                | 1 -> On
-                | _ -> Meaning
-            getRubyText rb symbol
+    match reveal with
+    | Kun ->
+        kanji.Kun |> orElse kanji.On
+    | On ->
+        kanji.On |> orElse kanji.Kun
+    | Meaning ->
+        kanji.Meaning
+    | Random ->
+        let rb =
+            match rand.Next(0, 3) with
+            | 0 -> Kun
+            | 1 -> On
+            | _ -> Meaning
+        getRubyText rb kanji
 
 let private queueNextCard index deck dispatch =
     let id = Fable.Core.JS.setTimeout (fun _ -> dispatch (CreateCard(index, deck))) 100
@@ -207,16 +202,21 @@ let update (msg: Msg) (state: Model) =
             let secondCard = state.Cards.[index]
 
             // Pair found
-            if firstCard.Symbol = secondCard.Symbol then
-                let rubyText = getRubyText state.Settings.RubyReveal secondCard.Symbol
-                let pairsFound = state.PairsFound + 1
+            if firstCard = secondCard then
                 let cards =
-                    state.Cards
-                    |> Array.map (fun card ->
-                        if card.Symbol = firstCard.Symbol then
-                            { card with RubyText = rubyText }
-                        else
-                            card)
+                    match firstCard with
+                    | Emoji _ ->
+                        state.Cards
+                    | Kanji kanji ->
+                        let rubyText = getRubyText state.Settings.RubyReveal kanji
+                        state.Cards
+                        |> Array.map (fun card ->
+                            match card with
+                            | Kanji k when k.Character = kanji.Character ->
+                                Kanji { k with RubyText = Some rubyText }
+                            | other ->
+                                other)
+                let pairsFound = state.PairsFound + 1
                 let gameWon = pairsFound = cardsForDifficulty state.Settings.Difficulty / 2
 
                 { state with FirstClicked = None
@@ -409,7 +409,7 @@ let renderControls state dispatch =
         ]
     ]
 
-let renderCard state dispatch index card =
+let renderCard state dispatch index (card: Card) =
     let isRevealed = state.RevealedCards.Contains index
     Html.div [
         prop.classes [ "mp-card"; if isRevealed then "flipped" ]
@@ -422,18 +422,18 @@ let renderCard state dispatch index card =
                 prop.children [
                     Html.div [
                         prop.className "mp-front-symbol"
-                        prop.text (
-                            match card.Symbol with
-                            | Kanji k -> k.Character
-                            | Emoji e -> e
-                        )
+                        prop.text card.Symbol
                     ]
-                    Html.div [
-                        prop.classes [ "mp-ruby"
-                                       sprintf "mp-ruby-%s" (state.Settings.Difficulty.ToString().ToLower())
-                                       if card.RubyText.IsSome then "mp-ruby-fadein" ]
-                        prop.text (Option.toObj card.RubyText)
-                    ]
+                    match card with
+                    | Kanji { RubyText = Some ruby } ->
+                        Html.div [
+                            prop.classes [ "mp-ruby"
+                                           sprintf "mp-ruby-%s" (state.Settings.Difficulty.ToString().ToLower())
+                                           "mp-ruby-fadein" ]
+                            prop.text ruby
+                        ]
+                    | _ ->
+                        ()
                 ]
             ]
             Html.div [

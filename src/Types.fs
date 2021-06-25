@@ -34,20 +34,21 @@ type Kanji =
     { Character : string
       Kun : string option
       On : string option
-      Meaning : string }
+      Meaning : string
+      RubyText : string option }
 
 type KanjiDefinition =
     { Kun : string
       On : string
       Meaning : string }
 
-type Symbol =
+type Card =
     | Emoji of string
     | Kanji of Kanji
-
-type Card =
-    { Symbol : Symbol
-      RubyText : string option }
+    member this.Symbol =
+        match this with
+        | Emoji e -> e
+        | Kanji k -> k.Character
 
 type Model =
     { FirstClicked : int option
