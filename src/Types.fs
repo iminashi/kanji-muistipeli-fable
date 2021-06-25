@@ -1,13 +1,11 @@
 module Types
 
 type KanjiLevel =
-    | Level1
-    | Level2
-    | Level3
-    | Level4
-    | Level5
-    | Level6
+    | Level of int
     | AllLevels
+    static member All =
+        seq { for i in 1..6 -> Level i
+              yield AllLevels }
 
 type GameType =
     | EmojiGame
@@ -18,20 +16,24 @@ type RubyRevealType =
     | Kun
     | On
     | Random
+    static member All = [ Meaning; Kun; On; Random ]
 
 type Difficulty =
     | Easy
     | Normal
     | Hard
     | Hardest
+    static member All = [ Easy; Normal; Hard; Hardest ]
 
 type Settings =
     { Game : GameType
       RubyReveal : RubyRevealType
       Difficulty : Difficulty }
 
+type KanjiCharacter = string
+
 type Kanji =
-    { Character : string
+    { Character : KanjiCharacter
       Kun : string option
       On : string option
       Meaning : string
@@ -55,7 +57,7 @@ type Model =
       SecondClicked : int option
       PairsFound : int
       Cards : Card array
-      KanjiDefinitions : Map<string, KanjiDefinition>
+      KanjiDefinitions : Map<KanjiCharacter, KanjiDefinition>
       RevealedCards : Set<int>
       GameWon : bool
       ShowSettings : bool

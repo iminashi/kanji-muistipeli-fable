@@ -3,23 +3,14 @@
 open Feliz
 open Elmish
 open Types
+open Utils
 open Fable.SimpleHttp
 open Thoth.Json
 
-let private formatTime time =
-    let hundreths = (time / 100) % 10
-    let seconds = time / 1000
-    let minutes = seconds / 60
-
-    sprintf "%02i:%02i.%i" minutes (seconds % 60) hundreths
+let private rand = System.Random()
 
 let private getKanjiArray = function
-    | Level1 -> Symbols.kanjiLevels.[0]
-    | Level2 -> Symbols.kanjiLevels.[1]
-    | Level3 -> Symbols.kanjiLevels.[2]
-    | Level4 -> Symbols.kanjiLevels.[3]
-    | Level5 -> Symbols.kanjiLevels.[4]
-    | Level6 -> Symbols.kanjiLevels.[5]
+    | Level lvl -> Symbols.kanjiLevels.[lvl - 1]
     | AllLevels -> Array.concat Symbols.kanjiLevels
 
 let private cardsForDifficulty = function
@@ -34,15 +25,9 @@ let private cardsPerRowForDifficulty = function
     | Hard    -> 6
     | Hardest -> 7
 
-let private swap i1 i2 (arr : 'a array) =
-    let temp = arr.[i1]
-    arr.[i1] <- arr.[i2]
-    arr.[i2] <- temp
-
-let private getRandomCard index (deck : Card array) =
-    let rand = System.Random()
+let private getRandomCard index (deck: Card array) =
     let randIndex = rand.Next(index, deck.Length)
-    swap index randIndex deck
+    Array.swapIndexes index randIndex deck
     deck.[index]
 
 let private generateSymbols settings =
@@ -51,21 +36,13 @@ let private generateSymbols settings =
         | EmojiGame -> Symbols.emoji
         | KanjiGame lvl -> getKanjiArray lvl
 
-    let rand = System.Random()
     let max = (cardsForDifficulty settings.Difficulty) / 2
 
     seq { for i in 0..(max - 1) do
             let randIndex = rand.Next(i, symbols.Length)
-            swap i randIndex symbols
+            Array.swapIndexes i randIndex symbols
             yield symbols.[i]
             yield symbols.[i] }
-
-let private kanjiDecoder : Decoder<KanjiDefinition> =
-  Decode.object (fun get -> {
-    Meaning = get.Required.At [ "meaning" ] Decode.string
-    Kun = get.Required.At [ "kun" ] Decode.string
-    On = get.Required.At [ "on" ] Decode.string
-  })
 
 let private createKanji kanjiDefs character =
     let def = kanjiDefs |> Map.find character
@@ -79,8 +56,6 @@ let private createCard gameType kanjiDefs character =
     match gameType with
     | EmojiGame -> Emoji character
     | KanjiGame _ -> createKanji kanjiDefs character
-
-let private rand = System.Random()
 
 let rec private getRubyText reveal (kanji: Kanji) =
     let orElse alternative preferred =
@@ -121,7 +96,7 @@ let init () =
                 Error(statusCode, responseText) }
 
     let settings =
-        { Game = KanjiGame Level1
+        { Game = KanjiGame (Level 1)
           RubyReveal = Meaning
           Difficulty = Normal }
 
@@ -322,14 +297,14 @@ let renderSettings state dispatch =
                 prop.className "mp-opt-title"
                 prop.text "Kanjit"
             ]
-            yield! [ Level1; Level2; Level3; Level4; Level5; Level6; AllLevels ]
-            |> List.map (fun level ->
+            yield! KanjiLevel.All
+            |> Seq.map (fun level ->
                 Html.div [
                     prop.classes [ "mp-button"; "mp-option"; if state.Settings.Game = KanjiGame level then "mp-selected" ]
                     prop.text (
                         match level with
                         | AllLevels -> "Kaikki"
-                        | lvl -> sprintf "%s. Luokka" ((string lvl).Substring(5))
+                        | Level level -> $"{level}. Luokka"
                     )
                     prop.onClick (fun _ -> dispatch (SetGameType (KanjiGame level)))
                 ]
@@ -339,7 +314,7 @@ let renderSettings state dispatch =
                 prop.className "mp-opt-title"
                 prop.text "Näytä"
             ]
-            yield! [ Meaning; Kun; On; Random ]
+            yield! RubyRevealType.All
             |> List.map (fun ruby ->
                 Html.div [
                     prop.classes [ "mp-button"; "mp-option"; if state.Settings.RubyReveal = ruby then "mp-selected" ]
@@ -357,7 +332,7 @@ let renderSettings state dispatch =
                 prop.className "mp-opt-title"
                 prop.text "Vaikeus"
             ]
-            yield! [ Easy; Normal; Hard; Hardest ]
+            yield! Difficulty.All
             |> List.map (fun diff ->
                 Html.div [
                     prop.classes [ "mp-button"; "mp-option"; if state.Settings.Difficulty = diff then "mp-selected" ]
