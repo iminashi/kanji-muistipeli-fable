@@ -29,6 +29,12 @@ body {
   margin: 0;
   height: auto;
 }
+.error {
+  text-align: center;
+  background-color: #f0ebd3;
+  white-space: pre-wrap;
+  font-family: sans-serif;
+}
 .mp-gameboard {
   display: grid;
   grid-template-columns: auto auto auto auto;

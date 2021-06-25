@@ -62,7 +62,8 @@ type Model =
       NextCardTimeout : int option
       HideCardsTimeout : int option
       TimeElapsed : int
-      Settings : Settings }
+      Settings : Settings
+      ErrorMessage : string option }
 
 type Msg =
     | CardClicked of index : int
@@ -79,4 +80,4 @@ type Msg =
     | SetDifficulty of Difficulty
     | SetNextCardTimeout of int
     | SetHideCardsTimeout of int
-    | KanjiDefinitionsLoaded of string
+    | KanjiDefinitionsLoaded of Result<string, int * string>
