@@ -459,20 +459,23 @@ let renderGameClearMessage dispatch =
         ]
     ]
 
+let renderErrorMessage errorMessage =
+    let message = errorMessage |> Option.toObj
+    let isVisible = errorMessage.IsSome
+
+    Html.div [
+        prop.className "error"
+        prop.style [ if isVisible then style.display.block else style.display.none ]
+        prop.children [
+            Html.strong [
+                prop.text message
+            ]
+        ]
+    ]
+
 let view (state: Model) dispatch =
     React.fragment [
-        match state.ErrorMessage with
-        | Some errorMessage ->
-            Html.div [
-                prop.className "error"
-                prop.children [
-                    Html.strong [
-                        prop.text errorMessage
-                    ]
-                ]
-            ]
-        | None ->
-            ()
+        renderErrorMessage state.ErrorMessage
         renderControls state dispatch
         renderGameBoard state dispatch
         if state.GameWon then renderGameClearMessage dispatch
