@@ -1,10 +1,12 @@
 # Kanji Muistipeli
 
-[Online version](https://iminashi.github.io/kanji-muistipeli-fable/)
+[![Screenshot](./images/screenshot.png)](https://iminashi.github.io/kanji-muistipeli-fable/)
 
-Matching game in Finnish with kanji characters.
+[Play Online](https://iminashi.github.io/kanji-muistipeli-fable/)
 
-This an F#/Fable/Elmish rewrite of the [game](https://github.com/iminashi/kanji-muistipeli) that I originally created with JavaScript/jQuery.
+A matching game in Finnish with kanji characters.
+
+This an F#/Fable/Elmish rewrite of [a game](https://github.com/iminashi/kanji-muistipeli) that I originally created with JavaScript/jQuery.
 
 ## Building and Running
 
