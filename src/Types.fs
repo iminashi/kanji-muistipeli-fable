@@ -29,6 +29,10 @@ type Settings =
     { Game : GameType
       RubyReveal : RubyRevealType
       Difficulty : Difficulty }
+    static member Default =
+        { Game = KanjiGame (Level 1)
+          RubyReveal = Meaning
+          Difficulty = Normal }
 
 type KanjiCharacter = string
 
@@ -77,7 +81,7 @@ type Msg =
     | TimerTick
     | CreateCard of num : int * deck : Card array
     | HideCards
-    | UpdateSettings of Settings
+    | SaveSettings
     | ToggleSettings
     | HideSettings
     | SetGameType of GameType

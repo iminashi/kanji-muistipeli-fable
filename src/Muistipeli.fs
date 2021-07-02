@@ -7,6 +7,8 @@ open Utils
 open Fable.SimpleHttp
 open Thoth.Json
 
+let private localStorage = Browser.Dom.window.localStorage
+
 let private rand = System.Random()
 
 let private getKanjiArray = function
@@ -91,7 +93,21 @@ let private randomBackIcons () =
 
 let private randomBackColor () =
     Symbols.backFaceColors.[rand.Next(0, Symbols.backFaceColors.Length)]
- 
+
+let private loadSettings () =
+    localStorage.getItem "kanji-mp-settings"
+    |> Decode.fromString settingsDecoder
+    |> function
+    | Ok settings -> settings
+    | Error _     -> Settings.Default
+
+let private saveSettings (state: Model) =
+    try
+        let settings = settingsEncoder state.Settings |> Encode.toString 0
+        localStorage.setItem("kanji-mp-settings", settings)
+    with _ ->
+        ()
+
 let init () =
     let loadDefinitions() = async {
         let! statusCode, responseText = Http.get "kanji.json"
@@ -100,11 +116,6 @@ let init () =
                 Ok responseText
             else
                 Error(statusCode, responseText) }
-
-    let settings =
-        { Game = KanjiGame (Level 1)
-          RubyReveal = Meaning
-          Difficulty = Normal }
 
     { FirstClicked = None
       SecondClicked = None
@@ -118,7 +129,7 @@ let init () =
       TimerOn = false
       TimeElapsed = 0
       ShowSettings = false
-      Settings = settings
+      Settings = loadSettings ()
       BackFaceColor = randomBackColor ()
       BackIcons = randomBackIcons ()
       ErrorMessage = None },
@@ -144,13 +155,16 @@ let update (msg: Msg) (state: Model) =
         { state with HideCardsTimeout = Some id }, Cmd.none
 
     | SetGameType game ->
-        { state with Settings = { state.Settings with Game = game } }, Cmd.ofMsg NewGame
+        { state with Settings = { state.Settings with Game = game } },
+        Cmd.batch [ Cmd.ofMsg NewGame; Cmd.ofMsg SaveSettings ]
 
     | SetRevealType reveal ->
-        { state with Settings = { state.Settings with RubyReveal = reveal } }, Cmd.none
+        { state with Settings = { state.Settings with RubyReveal = reveal } },
+        Cmd.ofMsg SaveSettings
 
     | SetDifficulty difficulty ->
-        { state with Settings = { state.Settings with Difficulty = difficulty } }, Cmd.ofMsg NewGame
+        { state with Settings = { state.Settings with Difficulty = difficulty } },
+        Cmd.batch [ Cmd.ofMsg NewGame; Cmd.ofMsg SaveSettings ]
 
     | CardClicked index when state.RevealedCards.Contains index ->
         state, Cmd.none
@@ -280,8 +294,9 @@ let update (msg: Msg) (state: Model) =
           ErrorMessage = None },
         Cmd.ofMsg CreateCards
 
-    | UpdateSettings newSettings ->
-        { state with Settings = newSettings }, Cmd.none
+    | SaveSettings ->
+        saveSettings state
+        state, Cmd.none
 
     | ToggleSettings ->
         { state with ShowSettings = not state.ShowSettings }, Cmd.none
