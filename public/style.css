@@ -10,6 +10,16 @@
     opacity: 1;
   }
 }
+@keyframes show-settings {
+  from {
+    transform: translateY(-15px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0px);
+    opacity: 1;
+  }
+}
 @keyframes fadein {
   from {
     opacity: 0;
@@ -190,6 +200,7 @@ body {
 }
 .mp-settings {
   padding: 1vmin;
+  animation: show-settings 0.4s ease-out;
 }
 .mp-settings h3 {
   font-family: 'Lucida Sans', 'Lucida Sans Regular', sans-serif;

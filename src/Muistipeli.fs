@@ -7,6 +7,8 @@ open Utils
 open Fable.SimpleHttp
 open Thoth.Json
 
+let private localStorage = Browser.Dom.window.localStorage
+
 let private rand = System.Random()
 
 let private getKanjiArray = function
@@ -86,6 +88,26 @@ let private queueHideCards dispatch =
     let id = Fable.Core.JS.setTimeout (fun _ -> dispatch HideCards) 1000
     dispatch (SetHideCardsTimeout id)
 
+let private randomBackIcons () =
+    Array.init 2 (fun i -> Symbols.backFaceIcons.[i].[rand.Next(0, Symbols.backFaceIcons.[i].Length)])
+
+let private randomBackColor () =
+    Symbols.backFaceColors.[rand.Next(0, Symbols.backFaceColors.Length)]
+
+let private loadSettings () =
+    localStorage.getItem "kanji-mp-settings"
+    |> Decode.fromString settingsDecoder
+    |> function
+    | Ok settings -> settings
+    | Error _     -> Settings.Default
+
+let private saveSettings (state: Model) =
+    try
+        let settings = settingsEncoder state.Settings |> Encode.toString 0
+        localStorage.setItem("kanji-mp-settings", settings)
+    with _ ->
+        ()
+
 let init () =
     let loadDefinitions() = async {
         let! statusCode, responseText = Http.get "kanji.json"
@@ -94,11 +116,6 @@ let init () =
                 Ok responseText
             else
                 Error(statusCode, responseText) }
-
-    let settings =
-        { Game = KanjiGame (Level 1)
-          RubyReveal = Meaning
-          Difficulty = Normal }
 
     { FirstClicked = None
       SecondClicked = None
@@ -112,7 +129,9 @@ let init () =
       TimerOn = false
       TimeElapsed = 0
       ShowSettings = false
-      Settings = settings
+      Settings = loadSettings ()
+      BackFaceColor = randomBackColor ()
+      BackIcons = randomBackIcons ()
       ErrorMessage = None },
     Cmd.OfAsync.perform loadDefinitions () KanjiDefinitionsLoaded
 
@@ -136,13 +155,16 @@ let update (msg: Msg) (state: Model) =
         { state with HideCardsTimeout = Some id }, Cmd.none
 
     | SetGameType game ->
-        { state with Settings = { state.Settings with Game = game } }, Cmd.ofMsg NewGame
+        { state with Settings = { state.Settings with Game = game } },
+        Cmd.batch [ Cmd.ofMsg NewGame; Cmd.ofMsg SaveSettings ]
 
     | SetRevealType reveal ->
-        { state with Settings = { state.Settings with RubyReveal = reveal } }, Cmd.none
+        { state with Settings = { state.Settings with RubyReveal = reveal } },
+        Cmd.ofMsg SaveSettings
 
     | SetDifficulty difficulty ->
-        { state with Settings = { state.Settings with Difficulty = difficulty } }, Cmd.ofMsg NewGame
+        { state with Settings = { state.Settings with Difficulty = difficulty } },
+        Cmd.batch [ Cmd.ofMsg NewGame; Cmd.ofMsg SaveSettings ]
 
     | CardClicked index when state.RevealedCards.Contains index ->
         state, Cmd.none
@@ -267,11 +289,14 @@ let update (msg: Msg) (state: Model) =
           TimeElapsed = 0
           ShowSettings = state.ShowSettings
           Settings = state.Settings
+          BackFaceColor = randomBackColor ()
+          BackIcons = randomBackIcons ()
           ErrorMessage = None },
         Cmd.ofMsg CreateCards
 
-    | UpdateSettings newSettings ->
-        { state with Settings = newSettings }, Cmd.none
+    | SaveSettings ->
+        saveSettings state
+        state, Cmd.none
 
     | ToggleSettings ->
         { state with ShowSettings = not state.ShowSettings }, Cmd.none
@@ -338,9 +363,9 @@ let renderSettings state dispatch =
                     prop.classes [ "mp-button"; "mp-option"; if state.Settings.Difficulty = diff then "mp-selected" ]
                     prop.text (
                         match diff with
-                        | Easy -> "Helppo"
-                        | Normal -> "Normaali"
-                        | Hard -> "Vaikea"
+                        | Easy    -> "Helppo"
+                        | Normal  -> "Normaali"
+                        | Hard    -> "Vaikea"
                         | Hardest -> "Vaikein"
                     )
                     prop.onClick (fun _ -> dispatch (SetDifficulty diff))
@@ -387,9 +412,9 @@ let renderControls state dispatch =
 let renderCard state dispatch index (card: Card) =
     let isRevealed = state.RevealedCards.Contains index
     Html.div [
+        prop.key index
         prop.classes [ "mp-card"; if isRevealed then "flipped" ]
         prop.style [ if isRevealed then style.cursor.defaultCursor ]
-        prop.key index
         prop.onClick (fun _ -> if not isRevealed then dispatch (CardClicked index))
         prop.children [
             Html.div [
@@ -413,7 +438,8 @@ let renderCard state dispatch index (card: Card) =
             ]
             Html.div [
                 prop.classes [ "mp-side"; "mp-card-back" ]
-                prop.text (Symbols.backIcons.[index % 2])
+                prop.style [ style.backgroundColor state.BackFaceColor ]
+                prop.text (state.BackIcons.[index % 2])
             ]
         ]
     ]
@@ -459,20 +485,23 @@ let renderGameClearMessage dispatch =
         ]
     ]
 
+let renderErrorMessage errorMessage =
+    let message = errorMessage |> Option.toObj
+    let isVisible = errorMessage.IsSome
+
+    Html.div [
+        prop.className "error"
+        prop.style [ if isVisible then style.display.block else style.display.none ]
+        prop.children [
+            Html.strong [
+                prop.text message
+            ]
+        ]
+    ]
+
 let view (state: Model) dispatch =
     React.fragment [
-        match state.ErrorMessage with
-        | Some errorMessage ->
-            Html.div [
-                prop.className "error"
-                prop.children [
-                    Html.strong [
-                        prop.text errorMessage
-                    ]
-                ]
-            ]
-        | None ->
-            ()
+        renderErrorMessage state.ErrorMessage
         renderControls state dispatch
         renderGameBoard state dispatch
         if state.GameWon then renderGameClearMessage dispatch
