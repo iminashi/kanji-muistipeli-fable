@@ -113,6 +113,7 @@ let init () =
       TimeElapsed = 0
       ShowSettings = false
       Settings = settings
+      BackFaceColor = Symbols.backFaceColors.[rand.Next(0, Symbols.backFaceColors.Length)]
       ErrorMessage = None },
     Cmd.OfAsync.perform loadDefinitions () KanjiDefinitionsLoaded
 
@@ -267,6 +268,7 @@ let update (msg: Msg) (state: Model) =
           TimeElapsed = 0
           ShowSettings = state.ShowSettings
           Settings = state.Settings
+          BackFaceColor = Symbols.backFaceColors.[rand.Next(0, Symbols.backFaceColors.Length)]
           ErrorMessage = None },
         Cmd.ofMsg CreateCards
 
@@ -338,9 +340,9 @@ let renderSettings state dispatch =
                     prop.classes [ "mp-button"; "mp-option"; if state.Settings.Difficulty = diff then "mp-selected" ]
                     prop.text (
                         match diff with
-                        | Easy -> "Helppo"
-                        | Normal -> "Normaali"
-                        | Hard -> "Vaikea"
+                        | Easy    -> "Helppo"
+                        | Normal  -> "Normaali"
+                        | Hard    -> "Vaikea"
                         | Hardest -> "Vaikein"
                     )
                     prop.onClick (fun _ -> dispatch (SetDifficulty diff))
@@ -387,9 +389,9 @@ let renderControls state dispatch =
 let renderCard state dispatch index (card: Card) =
     let isRevealed = state.RevealedCards.Contains index
     Html.div [
+        prop.key index
         prop.classes [ "mp-card"; if isRevealed then "flipped" ]
         prop.style [ if isRevealed then style.cursor.defaultCursor ]
-        prop.key index
         prop.onClick (fun _ -> if not isRevealed then dispatch (CardClicked index))
         prop.children [
             Html.div [
@@ -413,6 +415,7 @@ let renderCard state dispatch index (card: Card) =
             ]
             Html.div [
                 prop.classes [ "mp-side"; "mp-card-back" ]
+                prop.style [ style.backgroundColor state.BackFaceColor ]
                 prop.text (Symbols.backIcons.[index % 2])
             ]
         ]

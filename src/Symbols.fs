@@ -13,3 +13,21 @@ let kanjiLevels =
     |]
 
 let backIcons = [| "🔵"; "⬜️" |]
+
+let backFaceColors =
+    [
+        "cadetblue"
+        "darkcyan"
+        "darkorange"
+        "dimgray"
+        "firebrick"
+        "lightblue"
+        "lightslategray"
+        "maroon"
+        "mediumseagreen"
+        "midnightblue"
+        "rebeccapurple"
+        "silver"
+        "steelblue"
+        "teal"
+    ]

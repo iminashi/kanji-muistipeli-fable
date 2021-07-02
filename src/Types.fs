@@ -66,6 +66,7 @@ type Model =
       HideCardsTimeout : int option
       TimeElapsed : int
       Settings : Settings
+      BackFaceColor : string
       ErrorMessage : string option }
 
 type Msg =
