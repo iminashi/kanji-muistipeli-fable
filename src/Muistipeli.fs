@@ -86,6 +86,12 @@ let private queueHideCards dispatch =
     let id = Fable.Core.JS.setTimeout (fun _ -> dispatch HideCards) 1000
     dispatch (SetHideCardsTimeout id)
 
+let private randomBackIcons () =
+    Array.init 2 (fun i -> Symbols.backFaceIcons.[i].[rand.Next(0, Symbols.backFaceIcons.[i].Length)])
+
+let private randomBackColor () =
+    Symbols.backFaceColors.[rand.Next(0, Symbols.backFaceColors.Length)]
+ 
 let init () =
     let loadDefinitions() = async {
         let! statusCode, responseText = Http.get "kanji.json"
@@ -113,7 +119,8 @@ let init () =
       TimeElapsed = 0
       ShowSettings = false
       Settings = settings
-      BackFaceColor = Symbols.backFaceColors.[rand.Next(0, Symbols.backFaceColors.Length)]
+      BackFaceColor = randomBackColor ()
+      BackIcons = randomBackIcons ()
       ErrorMessage = None },
     Cmd.OfAsync.perform loadDefinitions () KanjiDefinitionsLoaded
 
@@ -268,7 +275,8 @@ let update (msg: Msg) (state: Model) =
           TimeElapsed = 0
           ShowSettings = state.ShowSettings
           Settings = state.Settings
-          BackFaceColor = Symbols.backFaceColors.[rand.Next(0, Symbols.backFaceColors.Length)]
+          BackFaceColor = randomBackColor ()
+          BackIcons = randomBackIcons ()
           ErrorMessage = None },
         Cmd.ofMsg CreateCards
 
@@ -416,7 +424,7 @@ let renderCard state dispatch index (card: Card) =
             Html.div [
                 prop.classes [ "mp-side"; "mp-card-back" ]
                 prop.style [ style.backgroundColor state.BackFaceColor ]
-                prop.text (Symbols.backIcons.[index % 2])
+                prop.text (state.BackIcons.[index % 2])
             ]
         ]
     ]

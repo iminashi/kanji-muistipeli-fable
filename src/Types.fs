@@ -67,6 +67,7 @@ type Model =
       TimeElapsed : int
       Settings : Settings
       BackFaceColor : string
+      BackIcons : string array
       ErrorMessage : string option }
 
 type Msg =
