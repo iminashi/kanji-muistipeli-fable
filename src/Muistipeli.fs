@@ -174,9 +174,10 @@ let update (msg: Msg) (state: Model) =
 
         match state.FirstClicked, state.SecondClicked with
         | None, None ->
-            { state with FirstClicked = Some index
-                         RevealedCards = revealed
-                         HideCardsTimeout = None }, Cmd.none
+            { state with
+                FirstClicked = Some index
+                RevealedCards = revealed
+                HideCardsTimeout = None }, Cmd.none
 
         | Some firstIndex, Some secondIndex ->
             state.HideCardsTimeout
@@ -189,10 +190,11 @@ let update (msg: Msg) (state: Model) =
                 |> Set.remove firstIndex
                 |> Set.add index
 
-            { state with FirstClicked = Some index
-                         SecondClicked = None
-                         RevealedCards = revealed
-                         HideCardsTimeout = None }, Cmd.none
+            { state with
+                FirstClicked = Some index
+                SecondClicked = None
+                RevealedCards = revealed
+                HideCardsTimeout = None }, Cmd.none
 
         | Some firstIndex, None ->
             let firstCard = state.Cards.[firstIndex]
@@ -216,16 +218,18 @@ let update (msg: Msg) (state: Model) =
                 let pairsFound = state.PairsFound + 1
                 let gameWon = pairsFound = cardsForDifficulty state.Settings.Difficulty / 2
 
-                { state with FirstClicked = None
-                             SecondClicked = None
-                             PairsFound = pairsFound
-                             Cards = cards
-                             GameWon = gameWon
-                             TimerOn = not gameWon
-                             RevealedCards = revealed }, Cmd.none
+                { state with
+                    FirstClicked = None
+                    SecondClicked = None
+                    PairsFound = pairsFound
+                    Cards = cards
+                    GameWon = gameWon
+                    TimerOn = not gameWon
+                    RevealedCards = revealed }, Cmd.none
             else
-                { state with RevealedCards = revealed
-                             SecondClicked = Some index }, Cmd.ofSub queueHideCards
+                { state with
+                    RevealedCards = revealed
+                    SecondClicked = Some index }, Cmd.ofSub queueHideCards
 
         | None, Some _ ->
             failwith "Invalid state."
@@ -240,9 +244,10 @@ let update (msg: Msg) (state: Model) =
             | _ ->
                 state.RevealedCards
         
-        { state with FirstClicked = None
-                     SecondClicked = None
-                     RevealedCards = revealed }, Cmd.none
+        { state with
+            FirstClicked = None
+            SecondClicked = None
+            RevealedCards = revealed }, Cmd.none
         
     | CreateCards ->
         let deck =
@@ -307,12 +312,14 @@ let update (msg: Msg) (state: Model) =
 let renderSettings state dispatch =
     Html.div [
         prop.className "mp-opt-cont"
+        // Prevent the settings from being hidden when clicking inside the container
+        prop.onClick (fun e -> e.stopPropagation())
         prop.children [
             Html.h3 [
                 prop.className "mp-opt-title"
                 prop.text "Symbolit"
             ]
-            Html.div [
+            Html.button [
                 prop.classes [ "mp-button"; "mp-option"; if state.Settings.Game = EmojiGame then "mp-selected" ]
                 prop.text "Emoji"
                 prop.onClick (fun _ -> dispatch (SetGameType EmojiGame))
@@ -324,7 +331,7 @@ let renderSettings state dispatch =
             ]
             yield! KanjiLevel.All
             |> Seq.map (fun level ->
-                Html.div [
+                Html.button [
                     prop.classes [ "mp-button"; "mp-option"; if state.Settings.Game = KanjiGame level then "mp-selected" ]
                     prop.text (
                         match level with
@@ -341,7 +348,7 @@ let renderSettings state dispatch =
             ]
             yield! RubyRevealType.All
             |> List.map (fun ruby ->
-                Html.div [
+                Html.button [
                     prop.classes [ "mp-button"; "mp-option"; if state.Settings.RubyReveal = ruby then "mp-selected" ]
                     prop.text (
                         match ruby with
@@ -359,7 +366,7 @@ let renderSettings state dispatch =
             ]
             yield! Difficulty.All
             |> List.map (fun diff ->
-                Html.div [
+                Html.button [
                     prop.classes [ "mp-button"; "mp-option"; if state.Settings.Difficulty = diff then "mp-selected" ]
                     prop.text (
                         match diff with
@@ -378,25 +385,25 @@ let renderControls state dispatch =
     Html.div [
         prop.className "mp-gamecontrols"
         prop.children [
-            Html.div [
+            Html.button [
                 prop.className "mp-button"
                 prop.text "Uusi peli"
-                prop.onClick (fun _ ->
-                    dispatch HideSettings
-                    dispatch NewGame)
+                prop.onClick (fun _ -> dispatch NewGame)
             ]
 
-            Html.div [
+            Html.button [
                 prop.className "mp-button"
                 prop.text "Asetukset"
                 prop.onClick (fun _ -> dispatch ToggleSettings)
             ]
 
             Html.div [
-                prop.classes [ "mp-slidedown"
-                               "mp-settings"
-                               "mp-shadow"
-                               if state.ShowSettings then "mp-displayed" ]
+                prop.classes [
+                    "mp-slidedown"
+                    "mp-settings"
+                    "mp-shadow"
+                    if state.ShowSettings then "mp-displayed"
+                ]
                 prop.children [
                     renderSettings state dispatch
                 ]
@@ -427,9 +434,11 @@ let renderCard state dispatch index (card: Card) =
                     match card with
                     | Kanji { RubyText = Some ruby } ->
                         Html.div [
-                            prop.classes [ "mp-ruby"
-                                           sprintf "mp-ruby-%s" (state.Settings.Difficulty.ToString().ToLower())
-                                           "mp-ruby-fadein" ]
+                            prop.classes [
+                                "mp-ruby"
+                                sprintf "mp-ruby-%s" (state.Settings.Difficulty.ToString().ToLower())
+                                "mp-ruby-fadein"
+                            ]
                             prop.text ruby
                         ]
                     | _ ->
@@ -447,7 +456,6 @@ let renderCard state dispatch index (card: Card) =
 let renderGameBoard state dispatch =
     Html.div [
         prop.classes [ "mp-gameboard"; if state.GameWon then "mp-blur" ]
-        prop.onClick (fun _ -> if state.ShowSettings then dispatch HideSettings)
         prop.style [
             let perRow = cardsPerRowForDifficulty state.Settings.Difficulty
             let totalCards = cardsForDifficulty state.Settings.Difficulty
@@ -500,9 +508,12 @@ let renderErrorMessage errorMessage =
     ]
 
 let view (state: Model) dispatch =
-    React.fragment [
-        renderErrorMessage state.ErrorMessage
-        renderControls state dispatch
-        renderGameBoard state dispatch
-        if state.GameWon then renderGameClearMessage dispatch
+    Html.div [
+        prop.onClick (fun _ -> if state.ShowSettings then dispatch HideSettings)
+        prop.children [
+            renderErrorMessage state.ErrorMessage
+            renderControls state dispatch
+            renderGameBoard state dispatch
+            if state.GameWon then renderGameClearMessage dispatch
+        ]
     ]
