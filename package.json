@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "dotnet fable watch src --run \"webpack serve\""
+    "start": "dotnet fable watch src --run \"webpack serve\"",
+    "build": "dotnet fable src --run webpack --mode production"
   },
   "author": "",
   "license": "ISC",
