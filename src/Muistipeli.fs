@@ -319,7 +319,7 @@ let renderSettings state dispatch =
                 prop.className "mp-opt-title"
                 prop.text "Symbolit"
             ]
-            Html.div [
+            Html.button [
                 prop.classes [ "mp-button"; "mp-option"; if state.Settings.Game = EmojiGame then "mp-selected" ]
                 prop.text "Emoji"
                 prop.onClick (fun _ -> dispatch (SetGameType EmojiGame))
@@ -331,7 +331,7 @@ let renderSettings state dispatch =
             ]
             yield! KanjiLevel.All
             |> Seq.map (fun level ->
-                Html.div [
+                Html.button [
                     prop.classes [ "mp-button"; "mp-option"; if state.Settings.Game = KanjiGame level then "mp-selected" ]
                     prop.text (
                         match level with
@@ -348,7 +348,7 @@ let renderSettings state dispatch =
             ]
             yield! RubyRevealType.All
             |> List.map (fun ruby ->
-                Html.div [
+                Html.button [
                     prop.classes [ "mp-button"; "mp-option"; if state.Settings.RubyReveal = ruby then "mp-selected" ]
                     prop.text (
                         match ruby with
@@ -366,7 +366,7 @@ let renderSettings state dispatch =
             ]
             yield! Difficulty.All
             |> List.map (fun diff ->
-                Html.div [
+                Html.button [
                     prop.classes [ "mp-button"; "mp-option"; if state.Settings.Difficulty = diff then "mp-selected" ]
                     prop.text (
                         match diff with
@@ -385,13 +385,13 @@ let renderControls state dispatch =
     Html.div [
         prop.className "mp-gamecontrols"
         prop.children [
-            Html.div [
+            Html.button [
                 prop.className "mp-button"
                 prop.text "Uusi peli"
                 prop.onClick (fun _ -> dispatch NewGame)
             ]
 
-            Html.div [
+            Html.button [
                 prop.className "mp-button"
                 prop.text "Asetukset"
                 prop.onClick (fun _ -> dispatch ToggleSettings)
