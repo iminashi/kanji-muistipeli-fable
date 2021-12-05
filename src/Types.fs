@@ -9,7 +9,7 @@ type KanjiLevel =
 
 type GameType =
     | EmojiGame
-    | KanjiGame of level : KanjiLevel
+    | KanjiGame of level: KanjiLevel
 
 type RubyRevealType =
     | Meaning
@@ -26,9 +26,9 @@ type Difficulty =
     static member All = [ Easy; Normal; Hard; Hardest ]
 
 type Settings =
-    { Game : GameType
-      RubyReveal : RubyRevealType
-      Difficulty : Difficulty }
+    { Game: GameType
+      RubyReveal: RubyRevealType
+      Difficulty: Difficulty }
     static member Default =
         { Game = KanjiGame (Level 1)
           RubyReveal = Meaning
@@ -37,16 +37,16 @@ type Settings =
 type KanjiCharacter = string
 
 type Kanji =
-    { Character : KanjiCharacter
-      Kun : string option
-      On : string option
-      Meaning : string
-      RubyText : string option }
+    { Character: KanjiCharacter
+      Kun: string option
+      On: string option
+      Meaning: string
+      RubyText: string option }
 
 type KanjiDefinition =
-    { Kun : string
-      On : string
-      Meaning : string }
+    { Kun: string
+      On: string
+      Meaning: string }
 
 type Card =
     | Emoji of string
@@ -57,29 +57,29 @@ type Card =
         | Kanji k -> k.Character
 
 type Model =
-    { FirstClicked : int option
-      SecondClicked : int option
-      PairsFound : int
-      Cards : Card array
-      KanjiDefinitions : Map<KanjiCharacter, KanjiDefinition>
-      RevealedCards : Set<int>
-      GameWon : bool
-      ShowSettings : bool
-      TimerOn : bool
-      NextCardTimeout : int option
-      HideCardsTimeout : int option
-      TimeElapsed : int
-      Settings : Settings
-      BackFaceColor : string
-      BackIcons : string array
-      ErrorMessage : string option }
+    { FirstClicked: int option
+      SecondClicked: int option
+      PairsFound: int
+      Cards: Card array
+      KanjiDefinitions: Map<KanjiCharacter, KanjiDefinition>
+      RevealedCards: Set<int>
+      GameWon: bool
+      ShowSettings: bool
+      TimerOn: bool
+      NextCardTimeout: int option
+      HideCardsTimeout: int option
+      TimeElapsed: int
+      Settings: Settings
+      BackFaceColor: string
+      BackIcons: string array
+      ErrorMessage: string option }
 
 type Msg =
-    | CardClicked of index : int
+    | CardClicked of index: int
     | NewGame
     | CreateCards
     | TimerTick
-    | CreateCard of num : int * deck : Card array
+    | CreateCard of number: int * deck: Card array
     | HideCards
     | SaveSettings
     | ToggleSettings

@@ -12,7 +12,7 @@ let private localStorage = Browser.Dom.window.localStorage
 let private rand = System.Random()
 
 let private getKanjiArray = function
-    | Level lvl -> Symbols.kanjiLevels.[lvl - 1]
+    | Level lvl -> Symbols.kanjiLevels[lvl - 1]
     | AllLevels -> Array.concat Symbols.kanjiLevels
 
 let private cardsForDifficulty = function
@@ -30,7 +30,7 @@ let private cardsPerRowForDifficulty = function
 let private getRandomCard index (deck: Card array) =
     let randIndex = rand.Next(index, deck.Length)
     Array.swapIndexes index randIndex deck
-    deck.[index]
+    deck[index]
 
 let private generateSymbols settings =
     let symbols =
@@ -43,8 +43,8 @@ let private generateSymbols settings =
     seq { for i in 0..(max - 1) do
             let randIndex = rand.Next(i, symbols.Length)
             Array.swapIndexes i randIndex symbols
-            yield symbols.[i]
-            yield symbols.[i] }
+            yield symbols[i]
+            yield symbols[i] }
 
 let private createKanji kanjiDefs character =
     let def = kanjiDefs |> Map.find character
@@ -61,7 +61,7 @@ let private createCard gameType kanjiDefs character =
 
 let rec private getRubyText reveal (kanji: Kanji) =
     let orElse alternative preferred =
-        preferred 
+        preferred
         |> Option.orElse alternative
         |> Option.defaultValue "MISSING READING"
 
@@ -89,10 +89,10 @@ let private queueHideCards dispatch =
     dispatch (SetHideCardsTimeout id)
 
 let private randomBackIcons () =
-    Array.init 2 (fun i -> Symbols.backFaceIcons.[i].[rand.Next(0, Symbols.backFaceIcons.[i].Length)])
+    Array.init 2 (fun i -> Symbols.backFaceIcons[i][rand.Next(0, Symbols.backFaceIcons[i].Length)])
 
 let private randomBackColor () =
-    Symbols.backFaceColors.[rand.Next(0, Symbols.backFaceColors.Length)]
+    Symbols.backFaceColors[rand.Next(0, Symbols.backFaceColors.Length)]
 
 let private loadSettings () =
     localStorage.getItem "kanji-mp-settings"
@@ -109,13 +109,14 @@ let private saveSettings (state: Model) =
         ()
 
 let init () =
-    let loadDefinitions() = async {
-        let! statusCode, responseText = Http.get "kanji.json"
-        return
-            if statusCode = 200 then
-                Ok responseText
-            else
-                Error(statusCode, responseText) }
+    let loadDefinitions() =
+        async {
+            match! Http.get "kanji.json" with
+            | 200, responseText ->
+                return Ok responseText
+            | statusCode, responseText ->
+                return Error(statusCode, responseText)
+        }
 
     { FirstClicked = None
       SecondClicked = None
@@ -170,7 +171,7 @@ let update (msg: Msg) (state: Model) =
         state, Cmd.none
 
     | CardClicked index ->
-        let revealed = state.RevealedCards.Add index
+        let revealed = state.RevealedCards.Add(index)
 
         match state.FirstClicked, state.SecondClicked with
         | None, None ->
@@ -197,8 +198,8 @@ let update (msg: Msg) (state: Model) =
                 HideCardsTimeout = None }, Cmd.none
 
         | Some firstIndex, None ->
-            let firstCard = state.Cards.[firstIndex]
-            let secondCard = state.Cards.[index]
+            let firstCard = state.Cards[firstIndex]
+            let secondCard = state.Cards[index]
 
             // Pair found
             if firstCard = secondCard then
@@ -208,13 +209,14 @@ let update (msg: Msg) (state: Model) =
                         state.Cards
                     | Kanji kanji ->
                         let rubyText = getRubyText state.Settings.RubyReveal kanji
+
                         state.Cards
-                        |> Array.map (fun card ->
-                            match card with
+                        |> Array.map (function
                             | Kanji k when k.Character = kanji.Character ->
                                 Kanji { k with RubyText = Some rubyText }
                             | other ->
                                 other)
+
                 let pairsFound = state.PairsFound + 1
                 let gameWon = pairsFound = cardsForDifficulty state.Settings.Difficulty / 2
 
@@ -260,16 +262,21 @@ let update (msg: Msg) (state: Model) =
 
     | TimerTick ->
         if state.TimerOn then
-            let task = async {
-                do! Async.Sleep 100
-                return TimerTick }
+            let task =
+                async {
+                    do! Async.Sleep 100
+                    return TimerTick
+                }
+
             { state with TimeElapsed = state.TimeElapsed + 100 }, Cmd.OfAsync.result task
         else
             state, Cmd.none
 
     | CreateCard (num, deck) ->
         let randomCard = deck |> getRandomCard (num - 1)
-        let newModel = { state with Cards = Array.append state.Cards [| randomCard |] }
+        let newModel =
+            { state with Cards = Array.append state.Cards [| randomCard |] }
+
         if num < cardsForDifficulty state.Settings.Difficulty then
             newModel, Cmd.ofSub (queueNextCard (num + 1) deck)
         else
@@ -338,7 +345,7 @@ let renderSettings state dispatch =
                         | AllLevels -> "Kaikki"
                         | Level level -> $"{level}. Luokka"
                     )
-                    prop.onClick (fun _ -> dispatch (SetGameType (KanjiGame level)))
+                    prop.onClick (fun _ -> dispatch (SetGameType(KanjiGame level)))
                 ]
             )
 
@@ -418,6 +425,7 @@ let renderControls state dispatch =
 
 let renderCard state dispatch index (card: Card) =
     let isRevealed = state.RevealedCards.Contains index
+
     Html.div [
         prop.key index
         prop.classes [ "mp-card"; if isRevealed then "flipped" ]
@@ -448,7 +456,7 @@ let renderCard state dispatch index (card: Card) =
             Html.div [
                 prop.classes [ "mp-side"; "mp-card-back" ]
                 prop.style [ style.backgroundColor state.BackFaceColor ]
-                prop.text (state.BackIcons.[index % 2])
+                prop.text (state.BackIcons[index % 2])
             ]
         ]
     ]
@@ -461,8 +469,7 @@ let renderGameBoard state dispatch =
             let totalCards = cardsForDifficulty state.Settings.Difficulty
 
             style.custom
-                ("gridTemplateColumns",
-                (sprintf "repeat(%i, auto)" perRow))
+                ("gridTemplateColumns", $"repeat({perRow}, auto)")
             style.custom
                 ("gridTemplateRows",
                 (sprintf "repeat(%i, auto)" (int <| ceil (float totalCards / float perRow))))
@@ -494,12 +501,11 @@ let renderGameClearMessage dispatch =
     ]
 
 let renderErrorMessage errorMessage =
-    let message = errorMessage |> Option.toObj
-    let isVisible = errorMessage.IsSome
+    let message = Option.toObj errorMessage
 
     Html.div [
         prop.className "error"
-        prop.style [ if isVisible then style.display.block else style.display.none ]
+        prop.hidden errorMessage.IsNone
         prop.children [
             Html.strong [
                 prop.text message

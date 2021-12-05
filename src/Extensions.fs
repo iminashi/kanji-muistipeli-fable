@@ -12,7 +12,7 @@ module Option =
 [<RequireQualifiedAccess>]
 module Array =
     /// Swaps two indexes in the given array.
-    let swapIndexes i1 i2 (arr : 'a array) =
-        let temp = arr.[i1]
-        arr.[i1] <- arr.[i2]
-        arr.[i2] <- temp
+    let swapIndexes i1 i2 (arr: 'a array) =
+        let temp = arr[i1]
+        arr[i1] <- arr[i2]
+        arr[i2] <- temp
